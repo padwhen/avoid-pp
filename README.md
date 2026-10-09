@@ -1,5 +1,7 @@
 # avoid-pp
 
+[![checks](https://github.com/padwhen/avoid-pp/actions/workflows/checks.yml/badge.svg)](https://github.com/padwhen/avoid-pp/actions/workflows/checks.yml)
+
 A Go/Python workspace for a prompt-injection detection API, initially evaluated
 around Finnish-to-English LLM translation.
 
@@ -68,7 +70,12 @@ Individual checks:
 make check-go
 make check-python
 make check-contracts
+make check-contracts-selftest
 ```
+
+Every pull request runs exactly these commands on a clean Linux checkout; see
+[C04 acceptance criteria](docs/c04-ci.md). No LLM provider credential is used
+or required.
 
 Dependency installation uses `uv sync --locked` so a stale lockfile fails rather
 than silently changing dependency versions. Commit `detector/uv.lock` whenever
@@ -86,9 +93,9 @@ examples/                    Future protected-translator integration example
 docs/                        Implementation notes and acceptance evidence
 ```
 
-Service subpackages will be created as their behavior is introduced; this commit
-does not create empty HTTP routes or fake protection behavior. CI wiring is C04,
-and runnable Go/Python HTTP services begin at C07/C08.
+Service subpackages will be created as their behavior is introduced; the
+bootstrap commit did not create empty HTTP routes or fake protection behavior.
+Runnable Go/Python HTTP services begin at C07/C08.
 
 ## Configuration and data hygiene
 

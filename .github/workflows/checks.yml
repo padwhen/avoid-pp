@@ -1,0 +1,83 @@
+name: checks
+
+# Fast, offline checks. These run the same Make targets documented in the
+# README, so a green run here means the documented local commands work on a
+# machine that is not the author's.
+#
+# No LLM provider is contacted and no secret is referenced. Live-model
+# evaluation is a separate, opt-in workflow introduced later (C13+), with its
+# own credentials and cost ceiling.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Go, Python and contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: .go-version
+          # gateway has no external modules yet, so there is no go.sum to key
+          # a cache on. Re-enable with cache-dependency-path when one exists.
+          cache: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          # Must match tool.uv required-version in detector/pyproject.toml.
+          version: "0.12.15"
+          enable-cache: true
+          cache-dependency-glob: detector/uv.lock
+
+      - name: Report toolchain
+        run: |
+          go version
+          uv --version
+
+      # Verifies C01-AC1 on a clean checkout: resolves Go modules and installs
+      # locked Python dependencies, provisioning the pinned interpreter.
+      - name: Bootstrap
+        run: make bootstrap
+
+      # C01-AC1 again: bootstrap must not rewrite manifests or the lockfile.
+      - name: Bootstrap left the tree unchanged
+        run: git diff --exit-code
+
+      - name: Check Go
+        run: make check-go
+
+      - name: Check Python
+        run: make check-python
+
+      - name: Check contracts
+        run: make check-contracts
+
+      # C04-AC2: the contract validator must reject deliberately bad data.
+      - name: Contract validator self-test
+        run: make check-contracts-selftest
+
+      # C04-AC3: nothing above may depend on a provider credential. Asserted
+      # rather than asserted-in-prose, so adding one to this workflow fails.
+      - name: No provider credentials required
+        run: |
+          if grep -rnE '\$\{\{ *secrets\.' .github/workflows; then
+            echo "::error::Default checks must not reference repository secrets."
+            exit 1
+          fi
+          echo "No secrets referenced by any workflow."
