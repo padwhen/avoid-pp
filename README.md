@@ -3,8 +3,8 @@
 A Go/Python workspace for a prompt-injection detection API, initially evaluated
 around Finnish-to-English LLM translation.
 
-**Status: C01 — repository bootstrap only.** There is no HTTP server, detector,
-translation service or security protection implemented yet.
+**Status: C02 — repository bootstrap and threat model only.** There is no HTTP
+server, detector, translation service or security protection implemented yet.
 
 Go will own the API, authentication, request limits and policy decisions. Python
 will own model integration, assessment validation and evaluation logic. The
@@ -98,3 +98,11 @@ are ignored. Put private datasets only in `data/private/` or
 Ignore rules are a safeguard, not a substitute for reviewing staged files.
 
 See [C01 acceptance criteria](docs/c01-bootstrap.md) for verification details.
+
+## Threat model
+
+[docs/threat-model.md](docs/threat-model.md) defines the supported scope, trust
+boundaries, failure behavior and policy modes for the Finnish-to-English task.
+Read it before adding any scanning, policy or translation behavior; it records
+what this service deliberately does not protect, and which capabilities remain
+unverified.
