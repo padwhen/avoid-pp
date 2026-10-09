@@ -38,7 +38,7 @@ jobs:
           cache: false
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v10
+        uses: astral-sh/setup-uv@v7
         with:
           # Must match tool.uv required-version in detector/pyproject.toml.
           version: "0.12.15"
