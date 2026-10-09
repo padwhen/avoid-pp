@@ -1,0 +1,42 @@
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.*
+secrets.*
+
+# Python environments, caches and build output
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+*.egg-info/
+
+# Generated artifacts and machine-local files
+bin/
+build/
+dist/
+coverage/
+*.test
+*.prof
+.DS_Store
+.idea/
+.vscode/
+
+# Evaluation outputs and private input data
+evals/reports/
+evals/datasets/private/
+data/private/
+
+# Local tooling and scratch work
+.tools/
+.workspace/
+tmp/
