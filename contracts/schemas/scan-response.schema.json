@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/padwhen/avoid-pp/contracts/schemas/scan-response.schema.json",
+  "title": "POST /v1/scans 200 response",
+  "description": "A COMPLETED assessment. This shape exists only for completed scans: `scan_status` has exactly one legal value, so an unavailable, timed-out, oversized or truncated outcome cannot be expressed here at all. Those are error envelopes (error.schema.json). A completed scan returns 200 even when its action is `block` — a block is a successful scan with an unwelcome answer, not an error.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["request_id", "scan_status", "assessment", "decision", "coverage", "versions"],
+  "properties": {
+    "request_id": { "$ref": "common.schema.json#/$defs/request_id" },
+    "scan_status": { "$ref": "common.schema.json#/$defs/scan_status" },
+    "assessment": { "$ref": "common.schema.json#/$defs/assessment" },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action", "reason_code"],
+      "properties": {
+        "action": { "$ref": "common.schema.json#/$defs/action" },
+        "reason_code": { "$ref": "common.schema.json#/$defs/reason_code" }
+      }
+    },
+    "coverage": { "$ref": "common.schema.json#/$defs/coverage" },
+    "versions": { "$ref": "common.schema.json#/$defs/versions" }
+  },
+  "allOf": [
+    {
+      "title": "A completed scan is never truncated",
+      "description": "scan_status=complete means every accepted input character was scanned. Byte equality (scanned == original) is additionally checked by the contract validator, since JSON Schema cannot compare two sibling numbers.",
+      "if": {
+        "properties": { "scan_status": { "const": "complete" } },
+        "required": ["scan_status"]
+      },
+      "then": {
+        "properties": {
+          "coverage": {
+            "properties": { "truncated": { "const": false } }
+          }
+        }
+      }
+    },
+    {
+      "title": "A clean label always allows",
+      "if": {
+        "properties": {
+          "assessment": {
+            "properties": { "label": { "const": "no_injection_detected" } },
+            "required": ["label"]
+          }
+        },
+        "required": ["assessment"]
+      },
+      "then": {
+        "properties": {
+          "decision": {
+            "properties": { "action": { "const": "allow" } }
+          }
+        }
+      }
+    },
+    {
+      "title": "A suspicious label never allows",
+      "description": "Structurally prevents the central failure this service exists to avoid: a non-clean assessment emerging as an allow decision.",
+      "if": {
+        "properties": {
+          "assessment": {
+            "properties": { "label": { "const": "suspicious" } },
+            "required": ["label"]
+          }
+        },
+        "required": ["assessment"]
+      },
+      "then": {
+        "properties": {
+          "decision": {
+            "properties": { "action": { "enum": ["flag", "block"] } }
+          }
+        }
+      }
+    },
+    {
+      "title": "An uncertain label never allows",
+      "if": {
+        "properties": {
+          "assessment": {
+            "properties": { "label": { "const": "uncertain" } },
+            "required": ["label"]
+          }
+        },
+        "required": ["assessment"]
+      },
+      "then": {
+        "properties": {
+          "decision": {
+            "properties": { "action": { "enum": ["flag", "block"] } }
+          }
+        }
+      }
+    },
+    {
+      "title": "The clean reason code belongs only to allow",
+      "if": {
+        "properties": {
+          "decision": {
+            "properties": { "reason_code": { "const": "clean_complete_scan" } },
+            "required": ["reason_code"]
+          }
+        },
+        "required": ["decision"]
+      },
+      "then": {
+        "properties": {
+          "decision": {
+            "properties": { "action": { "const": "allow" } }
+          }
+        }
+      }
+    }
+  ]
+}

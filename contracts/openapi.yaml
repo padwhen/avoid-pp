@@ -1,0 +1,131 @@
+openapi: 3.1.0
+
+info:
+  title: avoid-pp scan API
+  version: 1.0.0
+  description: >
+    Prompt-injection scanning for an LLM translation task. The service returns an
+    assessment and a decision; it cannot enforce behaviour inside a caller that
+    ignores the result. See ../docs/threat-model.md.
+
+    No server implements this document yet. The Go gateway arrives at C07 and the
+    Python detector at C08; this contract is frozen first so both are written
+    against the same shape.
+
+servers:
+  - url: http://localhost:8080
+    description: Local development (C12 Compose). Not a deployed environment.
+
+tags:
+  - name: public
+    description: Called by an application backend.
+  - name: private
+    description: Gateway to detector only. Never exposed to the public network.
+
+paths:
+  /v1/scans:
+    post:
+      tags: [public]
+      summary: Scan one passage before it is translated
+      operationId: createScan
+      description: >
+        Returns 200 for any COMPLETED assessment, including one whose action is
+        `block` — a block is a successful scan with an unwelcome answer. Every
+        other outcome is an error envelope, never a clean assessment.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './schemas/scan-request.schema.json'
+      responses:
+        '200':
+          description: >
+            Completed assessment. The caller MUST honour `decision.action`, and
+            MUST treat any action value it does not recognise as `block`.
+          content:
+            application/json:
+              schema:
+                $ref: './schemas/scan-response.schema.json'
+        '400':
+          description: Malformed JSON. Code `malformed_json`.
+          content:
+            application/json:
+              schema: { $ref: './schemas/error.schema.json' }
+        '401':
+          description: Missing or invalid credentials. Code `unauthenticated`.
+          content:
+            application/json:
+              schema: { $ref: './schemas/error.schema.json' }
+        '403':
+          description: Caller not authorised for this task. Code `unauthorized_task`.
+          content:
+            application/json:
+              schema: { $ref: './schemas/error.schema.json' }
+        '413':
+          description: Body or text byte limit exceeded. Code `payload_too_large`.
+          content:
+            application/json:
+              schema: { $ref: './schemas/error.schema.json' }
+        '422':
+          description: >
+            Schema violation or token-budget violation. Codes `schema_invalid`,
+            `unknown_task_id`, `token_budget_exceeded`. Rejected before any
+            provider call, so no partial scan is performed.
+          content:
+            application/json:
+              schema: { $ref: './schemas/error.schema.json' }
+        '429':
+          description: Caller quota exhausted. Code `rate_limited`.
+          content:
+            application/json:
+              schema: { $ref: './schemas/error.schema.json' }
+        '503':
+          description: >
+            Detector unavailable or gateway overloaded. Codes
+            `detector_unavailable`, `overloaded`. Never degraded to an allow.
+          content:
+            application/json:
+              schema: { $ref: './schemas/error.schema.json' }
+        '504':
+          description: End-to-end deadline expired. Code `deadline_exceeded`.
+          content:
+            application/json:
+              schema: { $ref: './schemas/error.schema.json' }
+
+  /internal/v1/assessments:
+    post:
+      tags: [private]
+      summary: Assess one passage (detector)
+      operationId: createAssessment
+      description: >
+        Private. Receives the original passage unmodified and returns an
+        assessment with evidence. Receives no policy and makes no decision.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './schemas/assessment-request.schema.json'
+      responses:
+        '200':
+          description: Assessment produced.
+          content:
+            application/json:
+              schema:
+                $ref: './schemas/assessment-response.schema.json'
+        '422':
+          description: Request failed strict validation.
+          content:
+            application/json:
+              schema: { $ref: './schemas/error.schema.json' }
+        '503':
+          description: Detector not ready or provider unavailable.
+          content:
+            application/json:
+              schema: { $ref: './schemas/error.schema.json' }
+        '504':
+          description: Assessment exceeded its deadline.
+          content:
+            application/json:
+              schema: { $ref: './schemas/error.schema.json' }

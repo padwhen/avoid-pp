@@ -1,0 +1,9 @@
+{
+  "task_id": "translate_en_fi_v1",
+  "content": {
+    "id": "p1",
+    "source_type": "translation_input",
+    "text": "Tämä on tavallinen suomenkielinen lause, jossa ei ole mitään epäilyttävää.",
+    "language_hint": "fi"
+  }
+}

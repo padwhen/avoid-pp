@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/padwhen/avoid-pp/contracts/schemas/scan-request.schema.json",
+  "title": "POST /v1/scans request",
+  "description": "Public scan request. The caller supplies a task name and one passage, and nothing else. There is deliberately no field for policy, mode, instructions, thresholds or trust level: every attempt to add one is a validation failure, because a caller must not be able to weaken its own scan.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["task_id", "content"],
+  "properties": {
+    "task_id": {
+      "$ref": "common.schema.json#/$defs/task_id"
+    },
+    "content": {
+      "description": "Exactly one passage. This is an object, not an array, so a request carrying two passages cannot be expressed at all rather than being silently truncated to the first. Batch scanning, if ever added, gets its own endpoint.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source_type", "text"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/content_id" },
+        "source_type": { "$ref": "common.schema.json#/$defs/source_type" },
+        "language_hint": { "$ref": "common.schema.json#/$defs/language_hint" },
+        "text": {
+          "description": "The original passage, untrusted for its entire length. maxLength is a cheap character-count ceiling; byte-accurate and tokenizer-accurate limits are enforced ahead of this schema (C16, C20) because UTF-8 characters are not bytes and bytes are not tokens.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32768
+        }
+      }
+    }
+  }
+}

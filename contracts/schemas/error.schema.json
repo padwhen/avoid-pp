@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/padwhen/avoid-pp/contracts/schemas/error.schema.json",
+  "title": "Error envelope",
+  "description": "Every non-200 outcome. `additionalProperties: false` is load-bearing: an error can never carry an `assessment`, `decision` or `scan_status`, so no failure path can present itself as a clean scan. A caller that receives this must not continue to translation under the example enforcement policy.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["request_id", "error"],
+  "properties": {
+    "request_id": { "$ref": "common.schema.json#/$defs/request_id" },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "description": "Stable machine-readable code. Maps to an HTTP status; see contracts/openapi.yaml. Clients branch on this, never on the message text.",
+          "type": "string",
+          "enum": [
+            "malformed_json",
+            "schema_invalid",
+            "unknown_task_id",
+            "unauthenticated",
+            "unauthorized_task",
+            "payload_too_large",
+            "token_budget_exceeded",
+            "rate_limited",
+            "detector_unavailable",
+            "overloaded",
+            "deadline_exceeded",
+            "internal_error"
+          ]
+        },
+        "message": {
+          "description": "Human-readable detail. Must never echo the passage, an evidence quote, a credential or a raw prompt.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "retry_after_seconds": {
+          "description": "Present on rate_limited and may be present on overloaded.",
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

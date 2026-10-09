@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/padwhen/avoid-pp/contracts/schemas/common.schema.json",
+  "title": "Shared contract definitions",
+  "description": "Enums and reusable objects shared by the public scan API and the private assessment API. Enum values are stable: once emitted they are never renamed or removed, only added to.",
+  "$defs": {
+    "task_id": {
+      "description": "Server-resolved task configuration. The caller names a task; it cannot supply the instructions, the target language, or the policy.",
+      "type": "string",
+      "enum": ["translate_fi_en_v1"]
+    },
+    "content_id": {
+      "description": "Caller-chosen identifier for one passage, echoed back on evidence so a quote can be traced to its source.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "source_type": {
+      "description": "What the passage is, from the application's point of view. Never widens trust: every source_type is untrusted.",
+      "type": "string",
+      "enum": ["translation_input"]
+    },
+    "language_hint": {
+      "description": "Routing metadata only. An assertion by the caller, not a verified upstream result. Never bypasses, shortens or disables scanning, and never relaxes policy. Absent is valid.",
+      "type": "string",
+      "pattern": "^[a-z]{2,3}$"
+    },
+    "label": {
+      "description": "The detector's assessment of the passage. Not a decision.",
+      "type": "string",
+      "enum": ["no_injection_detected", "suspicious", "uncertain"]
+    },
+    "action": {
+      "description": "What the caller must do. CLIENT RULE: any value not recognized by the client MUST be treated as `block`. This lets the enum grow without breaking callers; `verify` is reserved for a future output-verification action and is never emitted today.",
+      "type": "string",
+      "enum": ["allow", "flag", "block"]
+    },
+    "scan_status": {
+      "description": "`complete` means every accepted input character was included in the supported scan path. It does NOT mean the model understood the passage. Any value other than `complete` forbids a clean verdict.",
+      "type": "string",
+      "enum": ["complete"]
+    },
+    "category": {
+      "description": "Coarse reason the passage looked like task redirection. Advisory; the label and action carry the decision.",
+      "type": "string",
+      "enum": [
+        "task_redirection",
+        "detector_targeting",
+        "system_prompt_extraction",
+        "output_format_hijack"
+      ]
+    },
+    "reason_code": {
+      "description": "Stable machine-readable explanation of the action, for telemetry and application branching.",
+      "type": "string",
+      "enum": [
+        "clean_complete_scan",
+        "suspicious_monitoring",
+        "suspicious_enforced",
+        "uncertain_monitoring",
+        "uncertain_enforced"
+      ]
+    },
+    "evidence_item": {
+      "description": "An exact, bounded quotation from the original passage. The quote MUST be verified to occur in the referenced content before it is returned; fabricated quotations are rejected upstream of this contract.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["content_id", "quote"],
+      "properties": {
+        "content_id": { "$ref": "#/$defs/content_id" },
+        "quote": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "category": { "$ref": "#/$defs/category" }
+      }
+    },
+    "assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "categories", "evidence"],
+      "properties": {
+        "label": { "$ref": "#/$defs/label" },
+        "categories": {
+          "type": "array",
+          "maxItems": 8,
+          "items": { "$ref": "#/$defs/category" }
+        },
+        "evidence": {
+          "type": "array",
+          "maxItems": 8,
+          "items": { "$ref": "#/$defs/evidence_item" }
+        }
+      }
+    },
+    "coverage": {
+      "description": "Byte accounting for the scan. A response claiming scan_status=complete must report scanned == original and truncated=false; this is enforced by the response schema, not by convention.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["original_utf8_bytes", "scanned_utf8_bytes", "truncated"],
+      "properties": {
+        "original_utf8_bytes": { "type": "integer", "minimum": 0 },
+        "scanned_utf8_bytes": { "type": "integer", "minimum": 0 },
+        "truncated": { "type": "boolean" }
+      }
+    },
+    "versions": {
+      "description": "Identifies exactly what produced this result, so any outcome can be reproduced and attributed in an evaluation report.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract", "detector", "prompt", "policy"],
+      "properties": {
+        "contract": { "type": "string", "minLength": 1 },
+        "detector": { "type": "string", "minLength": 1 },
+        "prompt": { "type": "string", "minLength": 1 },
+        "policy": { "type": "string", "minLength": 1 }
+      }
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    }
+  }
+}

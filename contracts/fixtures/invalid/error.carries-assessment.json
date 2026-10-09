@@ -1,0 +1,12 @@
+{
+  "request_id": "req-bad-6",
+  "error": {
+    "code": "detector_unavailable",
+    "message": "Detector is not available."
+  },
+  "assessment": {
+    "label": "no_injection_detected",
+    "categories": [],
+    "evidence": []
+  }
+}

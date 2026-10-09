@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/padwhen/avoid-pp/contracts/schemas/assessment-request.schema.json",
+  "title": "POST /internal/v1/assessments request (private)",
+  "description": "Gateway -> detector. Carries the resolved task and the ORIGINAL passage, unmodified. The detector receives no policy and no mode: it assesses, it does not decide. Never exposed publicly.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["request_id", "task_id", "content"],
+  "properties": {
+    "request_id": { "$ref": "common.schema.json#/$defs/request_id" },
+    "task_id": { "$ref": "common.schema.json#/$defs/task_id" },
+    "content": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source_type", "text"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/content_id" },
+        "source_type": { "$ref": "common.schema.json#/$defs/source_type" },
+        "language_hint": { "$ref": "common.schema.json#/$defs/language_hint" },
+        "text": {
+          "description": "Byte-for-byte identical to the text the caller submitted. No normalization, truncation or span removal, whatever the language_hint says.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32768
+        }
+      }
+    },
+    "deadline_ms": {
+      "description": "Remaining budget for the whole assessment, including any provider retry. Shared with the gateway's end-to-end deadline rather than restarting it.",
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}
