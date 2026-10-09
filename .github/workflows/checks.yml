@@ -27,10 +27,10 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version-file: .go-version
           # gateway has no external modules yet, so there is no go.sum to key
@@ -38,7 +38,7 @@ jobs:
           cache: false
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v10
         with:
           # Must match tool.uv required-version in detector/pyproject.toml.
           version: "0.12.15"
