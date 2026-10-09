@@ -3,8 +3,9 @@
 A Go/Python workspace for a prompt-injection detection API, initially evaluated
 around Finnish-to-English LLM translation.
 
-**Status: C02 — repository bootstrap and threat model only.** There is no HTTP
-server, detector, translation service or security protection implemented yet.
+**Status: C03 — bootstrap, threat model and API contract only.** There is no
+HTTP server, detector, translation service or security protection implemented
+yet; the contract is frozen before the services that implement it.
 
 Go will own the API, authentication, request limits and policy decisions. Python
 will own model integration, assessment validation and evaluation logic. The
@@ -66,6 +67,7 @@ Individual checks:
 ```sh
 make check-go
 make check-python
+make check-contracts
 ```
 
 Dependency installation uses `uv sync --locked` so a stale lockfile fails rather
@@ -78,7 +80,7 @@ be added with the code that needs them.
 ```text
 gateway/                     Go module for the future API and policy layer
 detector/                    Installable Python package and locked developer tools
-contracts/                   Future public/private API schemas and shared fixtures
+contracts/                   Public/private API schemas, OpenAPI and shared fixtures
 evals/                       Future reviewed datasets, runners and generated reports
 examples/                    Future protected-translator integration example
 docs/                        Implementation notes and acceptance evidence
@@ -98,6 +100,15 @@ are ignored. Put private datasets only in `data/private/` or
 Ignore rules are a safeguard, not a substitute for reviewing staged files.
 
 See [C01 acceptance criteria](docs/c01-bootstrap.md) for verification details.
+
+## API contract
+
+[contracts/](contracts/) holds the frozen public scan and private assessment
+schemas, the OpenAPI document and the positive/negative fixtures. `make
+check-contracts` validates both directions. Three properties are structural
+rather than documented: a caller cannot supply policy, a non-clean assessment
+cannot emerge as `allow`, and a failure cannot be expressed in the success
+shape. See [C03 acceptance criteria](docs/c03-contracts.md).
 
 ## Threat model
 

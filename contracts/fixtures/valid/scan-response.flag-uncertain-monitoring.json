@@ -1,0 +1,24 @@
+{
+  "request_id": "req-unc-1",
+  "scan_status": "complete",
+  "assessment": {
+    "label": "uncertain",
+    "categories": [],
+    "evidence": []
+  },
+  "decision": {
+    "action": "flag",
+    "reason_code": "uncertain_monitoring"
+  },
+  "coverage": {
+    "original_utf8_bytes": 124,
+    "scanned_utf8_bytes": 124,
+    "truncated": false
+  },
+  "versions": {
+    "contract": "1.0.0",
+    "detector": "fake-0",
+    "prompt": "none",
+    "policy": "monitoring-1"
+  }
+}

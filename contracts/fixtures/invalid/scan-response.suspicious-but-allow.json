@@ -1,0 +1,26 @@
+{
+  "request_id": "req-bad-1",
+  "scan_status": "complete",
+  "assessment": {
+    "label": "suspicious",
+    "categories": [
+      "task_redirection"
+    ],
+    "evidence": []
+  },
+  "decision": {
+    "action": "allow",
+    "reason_code": "clean_complete_scan"
+  },
+  "coverage": {
+    "original_utf8_bytes": 103,
+    "scanned_utf8_bytes": 103,
+    "truncated": false
+  },
+  "versions": {
+    "contract": "1.0.0",
+    "detector": "fake-0",
+    "prompt": "none",
+    "policy": "monitoring-1"
+  }
+}

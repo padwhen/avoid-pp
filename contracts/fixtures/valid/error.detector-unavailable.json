@@ -1,0 +1,7 @@
+{
+  "request_id": "req-detector-unavailable",
+  "error": {
+    "code": "detector_unavailable",
+    "message": "Detector is not available."
+  }
+}

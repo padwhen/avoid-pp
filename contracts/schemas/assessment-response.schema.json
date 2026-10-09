@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/padwhen/avoid-pp/contracts/schemas/assessment-response.schema.json",
+  "title": "POST /internal/v1/assessments 200 response (private)",
+  "description": "Detector -> gateway. An assessment and the evidence for it, with no decision attached. There is deliberately no confidence number: an LLM-invented probability is not calibrated and must not be presented as if it were.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["request_id", "assessment", "coverage", "versions"],
+  "properties": {
+    "request_id": { "$ref": "common.schema.json#/$defs/request_id" },
+    "assessment": { "$ref": "common.schema.json#/$defs/assessment" },
+    "coverage": { "$ref": "common.schema.json#/$defs/coverage" },
+    "versions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["detector", "prompt"],
+      "properties": {
+        "detector": { "type": "string", "minLength": 1 },
+        "prompt": { "type": "string", "minLength": 1 }
+      }
+    },
+    "diagnostics": {
+      "description": "Optional, non-authoritative. Unknown provider usage is reported as absent, never as zero.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "model": { "type": "string", "minLength": 1 },
+        "latency_ms": { "type": "integer", "minimum": 0 },
+        "input_tokens": { "type": "integer", "minimum": 0 },
+        "output_tokens": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}
