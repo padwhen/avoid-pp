@@ -5,11 +5,11 @@
 A Go/Python workspace for a prompt-injection detection API, initially evaluated
 around Finnish-to-English LLM translation.
 
-**Status: C12 — the slice runs with one command.** `make up` starts both
-services in containers; the scan endpoint reaches the detector and returns an
-assessment and a decision under a configured monitoring or enforcement policy.
-The detector still matches keywords rather than understanding text until C13,
-and no LLM provider is called anywhere.
+**Status: C13 — a real detector, behind an opt-in switch.** `make up` starts
+both services in containers and the scan endpoint returns an assessment and a
+decision under a configured policy. The detector defaults to a keyword fake
+with no provider calls; live Claude detection is opt-in and costs money per
+scan. The prompt is not yet versioned or evaluated.
 
 Go will own the API, authentication, request limits and policy decisions. Python
 will own model integration, assessment validation and evaluation logic. The
@@ -185,6 +185,22 @@ diacritics, zero-width characters, ZWJ emoji, bidi marks, CRLF, astral-plane
 code points — are asserted unchanged across the real HTTP hop, and six
 foreign-language spans must survive under a Finnish hint. See
 [C10 acceptance criteria](docs/c10-text-preservation.md).
+
+## Live detection
+
+Fake is the default: no key, no spend, and that is what CI runs. Live is opt-in.
+
+```sh
+AVOIDPP_DETECTOR_MODE=live make run-detector   # needs LLM_API_KEY in .env
+make live-smoke CONFIRM=yes                    # 4 real requests, costs money
+```
+
+The request uses structured outputs rather than tool use, so no tool
+definitions are exposed for a passage to aim at, and the passage travels as
+fenced data in a user message rather than anywhere near the system prompt.
+Every provider failure — timeout, refusal, rate limit, outage — raises rather
+than returning a clean verdict. See
+[C13 acceptance criteria](docs/c13-provider-adapter.md).
 
 ## Policy
 

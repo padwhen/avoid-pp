@@ -10,7 +10,7 @@ DETECTOR_HOST ?= 127.0.0.1
 DETECTOR_PORT ?= 9000
 
 .DEFAULT_GOAL := help
-.PHONY: help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner run-gateway run-detector up down logs smoke
+.PHONY: help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner run-gateway run-detector up down logs smoke live-smoke
 
 help:
 	@printf '%s\n' \
@@ -27,7 +27,8 @@ help:
 	  'make up            Build and start both services with Compose' \
 	  'make smoke         Exercise the running stack and assert the responses' \
 	  'make logs          Follow Compose logs' \
-	  'make down          Stop and remove the Compose stack'
+	  'make down          Stop and remove the Compose stack' \
+	  'make live-smoke    Call the real provider (COSTS MONEY; needs CONFIRM=yes)'
 
 bootstrap: bootstrap-go bootstrap-python
 
@@ -85,3 +86,8 @@ logs:
 
 down:
 	docker compose down -v
+
+# The only target that spends money. Never run by CI or by `make check`.
+live-smoke:
+	cd detector && $(UV) run --locked --no-sync python ../scripts/live-smoke.py \
+	  $(if $(filter yes,$(CONFIRM)),--confirm,) $(if $(MODEL),--model $(MODEL),)

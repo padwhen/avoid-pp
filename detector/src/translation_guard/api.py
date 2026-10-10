@@ -25,8 +25,14 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from translation_guard.config import Settings
-from translation_guard.detectors import Detector, DetectorUnavailable, FakeDetector
+from translation_guard.config import DetectorMode, Settings
+from translation_guard.detectors import (
+    ClaudeDetector,
+    Detector,
+    DetectorUnavailable,
+    FakeDetector,
+)
+from translation_guard.detectors.claude import PROMPT_VERSION as CLAUDE_PROMPT_VERSION
 from translation_guard.schemas import (
     AssessmentRequest,
     AssessmentResponse,
@@ -50,7 +56,19 @@ class State:
 
 
 def build_detector(settings: Settings) -> Detector:
-    """Select the detector implementation. Only ``fake`` exists until C13."""
+    """Select the detector implementation.
+
+    Fake is the default. Live is opt-in because every scan costs money, and
+    a missing key fails at startup so the service reports not-ready rather
+    than accepting traffic it cannot serve.
+    """
+    if settings.mode is DetectorMode.LIVE:
+        return ClaudeDetector(
+            api_key=settings.api_key,
+            model=settings.model,
+            identity=f"claude:{settings.model}",
+            timeout_seconds=settings.request_timeout_seconds,
+        )
     return FakeDetector(
         identity=settings.detector_version,
         fail_start=settings.fail_initialisation,
@@ -190,7 +208,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             ),
             versions=Versions(
                 detector=state.detector.identity,
-                prompt=resolved.prompt_version,
+                prompt=(
+                    CLAUDE_PROMPT_VERSION
+                    if resolved.mode is DetectorMode.LIVE
+                    else resolved.prompt_version
+                ),
             ),
         )
 
