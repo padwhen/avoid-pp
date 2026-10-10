@@ -276,3 +276,26 @@ def test_prompt_version_is_recorded():
     """A result must be attributable to the prompt that produced it."""
     assert PROMPT_VERSION
     assert PROMPT_VERSION != "none"
+
+
+# Found by the first live run: a reply that violates the output schema raised
+# a ValidationError straight out of assess(), crashing the request path
+# instead of returning 503. Any unexpected failure is an operational failure.
+async def test_unexpected_failures_become_detector_unavailable():
+    class Boom(Exception):
+        pass
+
+    with pytest.raises(DetectorUnavailable):
+        await detector_with(StubMessages(error=Boom("schema violation"))).assess(
+            content()
+        )
+
+
+async def test_cancellation_is_not_swallowed():
+    """A cancelled request is the caller withdrawing, not a detector failure."""
+    import asyncio
+
+    with pytest.raises(asyncio.CancelledError):
+        await detector_with(StubMessages(error=asyncio.CancelledError())).assess(
+            content()
+        )

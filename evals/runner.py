@@ -231,8 +231,14 @@ def metrics(counts: dict[str, int]) -> dict[str, Any]:
 
 
 def build_report(
-    dataset: Path, adapter_name: str, counts: dict[str, int], per_case, deferred
+    dataset: Path, detector_identity: str, counts: dict[str, int], per_case, deferred
 ) -> dict[str, Any]:
+    """Build the report.
+
+    ``detector_identity`` is recorded verbatim. It used to be prefixed with
+    "fake:" here, which silently labelled the first live run as fake - an
+    evaluation record that misattributes what produced it is worse than none.
+    """
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "dataset": {
@@ -242,7 +248,7 @@ def build_report(
             "deferred_quality_cases": len(deferred),
         },
         "detector": {
-            "identity": f"fake:{adapter_name}",
+            "identity": detector_identity,
             "prompt_version": "none",
             "config_version": "c06-runner-1",
         },
@@ -305,7 +311,11 @@ def main(argv: list[str] | None = None) -> int:
     cases = load_cases(args.dataset)
     result, per_case = score(cases, ADAPTERS[args.adapter])
     report = build_report(
-        args.dataset, args.adapter, result["counts"], per_case, result["deferred"]
+        args.dataset,
+        f"fake:{args.adapter}",
+        result["counts"],
+        per_case,
+        result["deferred"],
     )
 
     if args.out:

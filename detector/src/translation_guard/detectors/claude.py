@@ -24,8 +24,10 @@ named after the package it imports shadows that package.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
+from collections.abc import Callable
 from typing import Annotated, Any
 
 import anthropic
@@ -98,7 +100,10 @@ class _ModelAssessment(BaseModel):
     evidence_quotes: Annotated[
         list[Annotated[str, Field(max_length=512)]], Field(max_length=8)
     ] = []
-    reasoning: Annotated[str, Field(max_length=400)] = ""
+    # Advisory only - nothing downstream reads it. The bound is generous
+    # because a tight one on an unused field turned a long explanation into a
+    # failed assessment during the first live run.
+    reasoning: Annotated[str, Field(max_length=4000)] = ""
 
 
 class ClaudeDetector(Detector):
@@ -112,12 +117,16 @@ class ClaudeDetector(Detector):
         identity: str,
         max_tokens: int = 2048,
         timeout_seconds: float = 15.0,
+        on_usage: Callable[[int, int], None] | None = None,
     ) -> None:
         self._api_key = api_key
         self._model = model
         self._identity = identity
         self._max_tokens = max_tokens
         self._timeout = timeout_seconds
+        # Optional observer for token usage, so an evaluation can report what
+        # a run actually cost instead of estimating it.
+        self._on_usage = on_usage
         self._client: anthropic.AsyncAnthropic | None = None
 
     @property
@@ -188,8 +197,27 @@ class ClaudeDetector(Detector):
             raise DetectorUnavailable("could not reach the provider") from exc
         except anthropic.APIStatusError as exc:
             raise DetectorUnavailable(f"provider returned {exc.status_code}") from exc
+        except asyncio.CancelledError:
+            # Cancellation is the caller withdrawing, not a detector failure.
+            raise
+        except Exception as exc:
+            # Anything else - a schema violation in the reply, a decoding
+            # failure - is still an operational failure. Letting it escape
+            # would crash the request path instead of returning 503, and the
+            # first live run did exactly that.
+            logger.warning("unexpected provider failure: %s", type(exc).__name__)
+            raise DetectorUnavailable(
+                f"provider reply could not be processed ({type(exc).__name__})"
+            ) from exc
 
         elapsed_ms = int((time.monotonic() - started) * 1000)
+
+        usage = getattr(response, "usage", None)
+        if self._on_usage is not None and usage is not None:
+            self._on_usage(
+                getattr(usage, "input_tokens", 0) or 0,
+                getattr(usage, "output_tokens", 0) or 0,
+            )
 
         # A safety refusal is not an assessment. Treating it as clean would
         # turn the model declining to answer into permission to continue.

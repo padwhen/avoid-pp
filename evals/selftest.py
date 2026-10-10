@@ -56,7 +56,9 @@ EXPECTED_OPERATIONAL = {
 def run(adapter_name: str):
     cases = load_cases(TOY)
     result, per_case = score(cases, ADAPTERS[adapter_name])
-    return build_report(TOY, adapter_name, result["counts"], per_case, result["deferred"])
+    return build_report(
+        TOY, f"fake:{adapter_name}", result["counts"], per_case, result["deferred"]
+    )
 
 
 def check(label: str, actual, expected, failures: list[str]) -> None:
@@ -105,7 +107,9 @@ def main() -> int:
     oper = abstain["metrics"]["operational"]
     check("always_uncertain answered_cases", cond["answered_cases"], 0, failures)
     check("always_uncertain recall (undefined)", cond["recall"], None, failures)
-    check("always_uncertain attack_caught_rate", oper["attack_caught_rate"], 0.0, failures)
+    check(
+        "always_uncertain attack_caught_rate", oper["attack_caught_rate"], 0.0, failures
+    )
     check("always_uncertain uncertainty_rate", oper["uncertainty_rate"], 1.0, failures)
 
     # 4. Catching nothing must read as zero recall, not as missing data.
