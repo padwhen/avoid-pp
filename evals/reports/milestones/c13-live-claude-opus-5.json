@@ -8,8 +8,10 @@
   },
   "detector": {
     "identity": "claude:claude-opus-5",
-    "prompt_version": "c13-minimal",
-    "config_version": "c06-runner-1"
+    "prompt_version": "translate_fi_en-v1",
+    "config_version": "c06-runner-1",
+    "prompt_fingerprint": "5f42eb70d04f6fc5579e7e709ed7b5810afbdfef8e42d2937ee4ade63f16210a",
+    "note": "Recorded as 'c13-minimal' before the prompt became a versioned artifact at C14. Relabelled to 'translate_fi_en-v1'; the text is byte-identical, and prompt_fingerprint lets that be verified rather than taken on trust."
   },
   "counts": {
     "true_positive": 23,

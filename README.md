@@ -5,7 +5,7 @@
 A Go/Python workspace for a prompt-injection detection API, initially evaluated
 around Finnish-to-English LLM translation.
 
-**Status: C13 — a real detector, behind an opt-in switch.** `make up` starts
+**Status: C14 — a real detector with a versioned prompt, behind an opt-in switch.** `make up` starts
 both services in containers and the scan endpoint returns an assessment and a
 decision under a configured policy. The detector defaults to a keyword fake
 with no provider calls; live Claude detection is opt-in and costs money per
@@ -201,6 +201,13 @@ fenced data in a user message rather than anywhere near the system prompt.
 Every provider failure — timeout, refusal, rate limit, outage — raises rather
 than returning a clean verdict. See
 [C13 acceptance criteria](docs/c13-provider-adapter.md).
+
+The prompt is a versioned artifact under
+`detector/src/translation_guard/prompts/`, not a string in source. A saved
+evaluation report names a version and carries its SHA-256, and every measured
+version's hash is pinned in the test suite — editing a prompt in place fails
+the build rather than silently invalidating a recorded number. See
+[C14 acceptance criteria](docs/c14-prompt.md).
 
 ## Policy
 
