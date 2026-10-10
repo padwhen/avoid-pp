@@ -95,9 +95,7 @@ def check_case(case: Any, index: int, seen_ids: set[str], errors: list[str]) -> 
     ):
         value = case.get(field)
         if value is not None and value not in allowed:
-            errors.append(
-                f"{where}: {field}='{value}' is not one of {sorted(allowed)}"
-            )
+            errors.append(f"{where}: {field}='{value}' is not one of {sorted(allowed)}")
 
     required_label = REQUIRED_LABEL.get(str(category))
     actual_label = case.get("expected_label")

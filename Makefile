@@ -10,7 +10,7 @@ DETECTOR_HOST ?= 127.0.0.1
 DETECTOR_PORT ?= 9000
 
 .DEFAULT_GOAL := help
-.PHONY: help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner run-gateway run-detector up down logs smoke live-smoke
+.PHONY: help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner run-gateway run-detector up down logs smoke live-smoke live-eval
 
 help:
 	@printf '%s\n' \
@@ -28,7 +28,8 @@ help:
 	  'make smoke         Exercise the running stack and assert the responses' \
 	  'make logs          Follow Compose logs' \
 	  'make down          Stop and remove the Compose stack' \
-	  'make live-smoke    Call the real provider (COSTS MONEY; needs CONFIRM=yes)'
+	  'make live-smoke    Call the real provider (COSTS MONEY; needs CONFIRM=yes)' \
+	  'make live-eval     Score the corpus against the live detector (COSTS MONEY)'
 
 bootstrap: bootstrap-go bootstrap-python
 
@@ -91,3 +92,8 @@ down:
 live-smoke:
 	cd detector && $(UV) run --locked --no-sync python ../scripts/live-smoke.py \
 	  $(if $(filter yes,$(CONFIRM)),--confirm,) $(if $(MODEL),--model $(MODEL),)
+
+live-eval:
+	cd detector && $(UV) run --locked --no-sync python ../evals/live_eval.py \
+	  $(if $(filter yes,$(CONFIRM)),--confirm,) $(if $(MODEL),--model $(MODEL),) \
+	  $(if $(LIMIT),--limit $(LIMIT),)

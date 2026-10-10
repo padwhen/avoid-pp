@@ -32,7 +32,14 @@ coverage/
 .vscode/
 
 # Evaluation outputs and private input data
-evals/reports/
+# Working evaluation runs are ignored. Note the trailing /* rather than /:
+# git cannot re-include a file whose parent DIRECTORY is excluded, so
+# excluding the contents is what makes the negation below work.
+evals/reports/*
+# Milestone reports are evidence, not working output - they pin a measurement
+# to a dataset hash, a detector identity and a prompt version, which is the
+# point of C06-AC2.
+!evals/reports/milestones/
 evals/datasets/private/
 data/private/
 
