@@ -97,13 +97,17 @@ const (
 type ErrorCode string
 
 const (
-	ErrCodeMalformedJSON       ErrorCode = "malformed_json"
-	ErrCodeSchemaInvalid       ErrorCode = "schema_invalid"
-	ErrCodeUnknownTaskID       ErrorCode = "unknown_task_id"
-	ErrCodeUnauthenticated     ErrorCode = "unauthenticated"
-	ErrCodeUnauthorizedTask    ErrorCode = "unauthorized_task"
-	ErrCodePayloadTooLarge     ErrorCode = "payload_too_large"
-	ErrCodeUnsupportedMedia    ErrorCode = "unsupported_media_type"
+	ErrCodeMalformedJSON    ErrorCode = "malformed_json"
+	ErrCodeSchemaInvalid    ErrorCode = "schema_invalid"
+	ErrCodeUnknownTaskID    ErrorCode = "unknown_task_id"
+	ErrCodeUnauthenticated  ErrorCode = "unauthenticated"
+	ErrCodeUnauthorizedTask ErrorCode = "unauthorized_task"
+	ErrCodePayloadTooLarge  ErrorCode = "payload_too_large"
+	ErrCodeUnsupportedMedia ErrorCode = "unsupported_media_type"
+	// Defined by error.schema.json since C03 and emitted since C32, when
+	// measuring capacity found that an over-budget passage was being
+	// reported as a detector outage.
+	ErrCodeTokenBudgetExceeded ErrorCode = "token_budget_exceeded"
 	ErrCodeRateLimited         ErrorCode = "rate_limited"
 	ErrCodeOverloaded          ErrorCode = "overloaded"
 	ErrCodeDetectorUnavailable ErrorCode = "detector_unavailable"

@@ -229,6 +229,21 @@ func Scan(deps ScanDeps) http.Handler {
 				outcome("deadline_exceeded", "error", err)
 				writeError(w, r, http.StatusGatewayTimeout,
 					contract.ErrCodeDeadlineExceeded, "Scan exceeded its deadline.")
+			case errors.Is(err, detector.ErrPassageTooLarge):
+				// The caller's problem, not the service's. Reported as such
+				// so a client stops rather than retries: 413 is permanent
+				// for this body, and the previous 503 was not.
+				outcome("passage_too_large", "error", err)
+				writeError(w, r, http.StatusRequestEntityTooLarge,
+					contract.ErrCodePayloadTooLarge,
+					"Passage exceeds the size limit for one scan.")
+			case errors.Is(err, detector.ErrTokenBudgetExceeded):
+				// The code the contract has defined since C03 and nothing
+				// emitted until C32.
+				outcome("token_budget_exceeded", "error", err)
+				writeError(w, r, http.StatusUnprocessableEntity,
+					contract.ErrCodeTokenBudgetExceeded,
+					"Passage exceeds the token budget for one scan.")
 			case errors.Is(err, detector.ErrResponseTooLarge), errors.Is(err, detector.ErrInvalidResponse):
 				// The detector answered, but not in a way that can be trusted.
 				outcome("invalid_response", "error", err)

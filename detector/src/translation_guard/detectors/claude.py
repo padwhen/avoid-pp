@@ -35,7 +35,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from translation_guard import prompts, retry
 from translation_guard.detectors.base import Detector, DetectorUnavailable
-from translation_guard.limits import Budget, InputTooLarge
+from translation_guard.limits import Budget
 from translation_guard.limits import check as check_limits
 from translation_guard.schemas import (
     Assessment,
@@ -201,10 +201,14 @@ class ClaudeDetector(Detector):
         # C16: bound the input before spending anything. An oversized passage
         # is refused outright - there is no path here that trims it and then
         # reports a complete scan.
-        try:
-            check_limits(content.text, self._budget)
-        except InputTooLarge as exc:
-            raise DetectorUnavailable(f"input rejected: {exc}") from exc
+        #
+        # InputTooLarge is deliberately *not* wrapped. Until C32 it became a
+        # DetectorUnavailable, which the service reported as 503 and the
+        # gateway passed on as `detector_unavailable` - so an oversized
+        # passage looked like an outage and invited a retry loop against a
+        # condition that will never clear. It propagates now and the API
+        # layer gives it the status the contract already has a code for.
+        check_limits(content.text, self._budget)
 
         request_timeout = self._timeout
         if deadline_ms is not None:
