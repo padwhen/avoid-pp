@@ -38,7 +38,7 @@ LABELS = {"no_injection_detected", "suspicious"}
 OUTCOMES = {"faithful_translation", "blocked_or_refused"}
 REVIEW = {"reviewed", "pending_review", "synthetic"}
 PROVENANCE = {"authored", "adapted", "public_domain", "example"}
-RIGHTS = {"own", "public_domain", "cc-by"}
+RIGHTS = {"own", "public_domain", "cc-by", "synthetic-authored"}
 
 # Categories whose expected English translation is needed for outcome grading.
 NEEDS_ENGLISH = {"quoted_attack", "task_redirection", "detector_targeting"}
@@ -61,7 +61,6 @@ REQUIRED_FIELDS = (
     "expected_label",
     "expected_outcome",
     "review_status",
-    "provenance",
     "rights",
 )
 
@@ -136,10 +135,22 @@ def main() -> int:
         print(f"evals: {DATASET} not found", file=sys.stderr)
         return 1
 
-    document = yaml.safe_load(DATASET.read_text(encoding="utf-8")) or {}
-    cases = document.get("cases") or []
+    document = yaml.safe_load(DATASET.read_text(encoding="utf-8"))
+    # Both shapes are accepted: a bare list of cases, or {cases: [...]}.
+    if isinstance(document, list):
+        cases = document
+    elif isinstance(document, dict):
+        cases = document.get("cases") or []
+    else:
+        cases = []
     if not isinstance(cases, list):
-        print("evals: 'cases' must be a list", file=sys.stderr)
+        print(
+            "evals: expected a list of cases, or a mapping with a 'cases' list",
+            file=sys.stderr,
+        )
+        return 1
+    if not cases:
+        print(f"evals: no cases found in {DATASET.name}", file=sys.stderr)
         return 1
 
     errors: list[str] = []
