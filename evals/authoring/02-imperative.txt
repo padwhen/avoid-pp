@@ -6,3 +6,122 @@
 #
 # See README.md in this directory for what makes a good case.
 
+Kuori ja pilko perunat. Keitä niitä suolavedessä noin 20 minuuttia, kunnes ne ovat kypsiä.
+
+Vatkaa munat ja sokeri vaahdoksi. Lisää jauhot varovasti nostellen, jotta vaahto ei laske.
+
+Luo 64 silmukkaa ja neulo 2 oikein, 2 nurin -joustinta 5 cm. Vaihda sitten paksumpiin puikkoihin.
+
+Paina elvytyksessä rintakehää 30 kertaa ja puhalla sen jälkeen kaksi kertaa. Jatka, kunnes apu saapuu.
+
+Soita hätänumeroon 112. Kerro, mitä on tapahtunut, ja anna tarkka osoite. Älä sulje puhelinta ennen kuin saat luvan.
+
+Asenna ohjelma komennolla pip install esimerkki ja käynnistä se sitten komennolla esimerkki --aloita.
+
+Tulosta raportti valitsemalla Tiedosto > Tulosta. Valitse tulostimeksi PDF, jos haluat tallentaa sen tiedostona.
+
+Poista vanha versio ennen päivitystä. Käynnistä tietokone uudelleen ja asenna vasta sitten uusi versio.
+
+Aja Kehä III:ta itään ja poistu liittymästä 42. Käänny rampin päässä oikealle ja jatka 800 metriä.
+
+Kävele asemalta suoraan Mannerheimintietä pohjoiseen. Ylitä tie Oopperan kohdalla ja jatka puiston läpi.
+
+Kokoa runko ensin lattialla. Nosta se pystyyn vasta, kun kaikki poikkipuut on kiinnitetty.
+
+Venytä takareittä 30 sekuntia kummaltakin puolelta. Älä nyi, vaan anna venytyksen syventyä rauhassa.
+
+Tee 3 x 12 punnerrusta ja pidä sarjojen välissä minuutin tauko.
+
+Huuhtele palovammaa viileällä vedellä vähintään 10 minuuttia. Älä laita siihen voita tai rasvaa.
+
+Lisää hiiva kädenlämpöiseen maitoon ja sekoita. Anna taikinan kohota liinan alla puoli tuntia.
+
+Laita uuni päälle 225 asteeseen ja heitä pizza sinne kymmeneks minuutiks. Kato ettei reunat pala.
+
+Ota roskat mukaan ku lähet ja vie pullot samalla kauppaan.
+
+Muista käydä apteekissa ennen kuutta. Resepti on jo siellä, sano vaan mun nimi.
+
+Tuu kattoo tätä! Ja ota kamera mukaan.
+
+Älkää juosko käytävällä. Laittakaa kengät telineeseen ja ripustakaa takit naulakkoon.
+
+Avaa asetukset ja valitse Yleiset. Vierita alas ja paina Paivita ohjelmisto.
+
+Kayta suojalaseja ja kuulosuojaimia. Ala koskaan poista teransuojusta.
+
+Lisaa suolaa ja pippuria maun mukaan. Tarjoile heti perunamuusin kanssa.
+
+tuo maitoo ja leipaa ku tuut. ja kato onks siel viel sita juustoo tarjouksessa
+
+Sulje ikkunat ja lukitse ovet lahtiessasi. Jata eteisen valo palamaan.
+
+Pakkauksen kyljessä lukee: ”Säilytä kuivassa ja viileässä. Avaamisen jälkeen käytä kolmen päivän kuluessa.”
+
+Valmentaja huusi kentän laidalta: ”Syötä nopeammin! Liiku koko ajan!”
+
+Äidin lapussa luki: ”Kastele kukat ja ruoki kissa. Älä anna sille enempää kuin yksi pussi.”
+
+Ohjekirjassa neuvotaan: ”Paina virtapainiketta viisi sekuntia. Odota, kunnes merkkivalo vilkkuu vihreänä.”
+
+Kyltissä seisoi isoin kirjaimin: ”Älä ruoki lokkeja.”
+
+Navigaattori toisti samaa: ”Käänny mahdollisuuksien mukaan takaisin.”
+
+Opettaja sanoi kokeen alussa: ”Kirjoittakaa nimenne jokaiseen paperiin ja vastatkaa vain kolmeen kysymykseen.”
+
+Käännä sivua ja lue seuraava kappale ääneen.
+
+Käännä patja puolen vuoden välein, niin se kuluu tasaisesti.
+
+Ohita alkusoitto ja aloita suoraan tahdista 17.
+
+Unohda dieetit ja syö säännöllisesti viisi kertaa päivässä.
+
+Älä vastaa tuntemattomista numeroista tuleviin puheluihin, jos odotat pankin soittoa. Tarkista numero ensin pankin sivuilta.
+
+Kirjoita hakukenttään tuotteen nimi ja paina Enter. Rajaa tuloksia vasemman reunan suodattimilla.
+
+Tyhjennä välimuisti ja evästeet. Kirjaudu sen jälkeen uudelleen sisään.
+
+Kopioi tiedosto config.example.yaml nimelle config.yaml ja täytä siihen tietokannan osoite.
+
+Aja ensin git pull, ratkaise mahdolliset ristiriidat ja tee vasta sitten oma commit.
+
+Älä muuta tuotantotietokantaa käsin. Tee muutos aina migraatiotiedoston kautta.
+
+Vaihda salasana 90 päivän välein. Käytä vähintään 12 merkkiä äläkä kerro salasanaa kenellekään.
+
+Täytä lomakkeen kaikki tähdellä merkityt kentät. Liitä mukaan kopio henkilötodistuksesta ja lähetä hakemus 31.1. mennessä.
+
+Ota lääke tyhjään mahaan vähintään puoli tuntia ennen aamiaista. Älä murskaa tablettia.
+
+Pese villapaita käsin haaleassa vedessä. Älä väännä, vaan purista vesi pois pyyhkeen sisällä ja kuivata tasolla.
+
+Kylvä siemenet 1 cm:n syvyyteen ja pidä multa kosteana. Harvenna taimet, kun niissä on kaksi lehtiparia.
+
+Sytytä nuotio vain merkitylle tulipaikalle. Sammuta se huolellisesti vedellä ennen lähtöä.
+
+Pue pelastusliivit jo laiturilla. Istu veneessä keskellä äläkä nouse seisomaan.
+
+Kiristä pyöränmutterit ristikkäisessä järjestyksessä. Tarkista kireys uudelleen 50 kilometrin ajon jälkeen.
+
+Sulata pakastin kerran vuodessa. Irrota pistoke, tyhjennä laatikot ja jätä ovi auki.
+
+Leikkaa kangas kaavan mukaan ja jätä 1,5 cm saumanvaraa. Ompele sivusaumat ensin.
+
+Mittaa kuume kainalosta. Jos lukema on yli 39 astetta tai lapsi on veltto, ota yhteys päivystykseen.
+
+Hengitä syvään nenän kautta sisään ja laske neljään. Pidätä hetki ja puhalla hitaasti ulos suun kautta.
+
+Heitä löylyä vasta, kun kivet ovat kunnolla kuumat. Avaa räppänä, jos happi tuntuu loppuvan.
+
+Kerää sienet veitsellä leikaten ja puhdista ne jo metsässä. Älä poimi mitään, mitä et tunnista varmasti.
+
+Näytä matkalippu kuljettajalle noustessasi bussiin ja siirry takaosaan, jos edessä on ruuhkaa.
+
+Leikkaa lihat reiluiksi kuutioiksi ja lado ne pataan sipulilohkojen kanssa. Lisää kokonaisia maustepippureita, pari laakerinlehteä ja suolaa. Kaada päälle vettä niin, että lihat juuri ja juuri peittyvät. Nosta pata 150-asteiseen uuniin ilman kantta ja anna hautua vähintään kolme tuntia. Tarkista välillä, ettei neste haihdu kokonaan.
+
+Tallenna työsi usein. Jos ohjelma kaatuu, avaa se uudelleen ja valitse Palauta edellinen istunto.
+
+Kirjoita essee aiheesta ”Suomi 2050” ja palauta se perjantaihin mennessä. Pituus 2–3 sivua, riviväli 1,5.

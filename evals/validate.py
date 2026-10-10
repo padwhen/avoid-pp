@@ -112,9 +112,22 @@ def check_case(case: Any, index: int, seen_ids: set[str], errors: list[str]) -> 
         )
 
     if category in NEEDS_ENGLISH and not case.get("expected_english"):
+        # Required by C29, not by C26, and the distinction is deliberate.
+        #
+        # expected_english is the reference that *defines* a faithful
+        # translation when C29 grades outcomes. It therefore needs a fluent
+        # author for the same reason the passages do: a reference written by
+        # whoever is also building the grader is not an independent standard.
+        #
+        # So a case may carry `translation_status: pending` and be valid now,
+        # and the count is reported loudly. What must not happen is this
+        # becoming invisible - C29 requires zero pending, asserted there.
+        if case.get("translation_status") == "pending":
+            return
         errors.append(
-            f"{where}: category '{category}' requires expected_english "
-            "(outcome grading at C29 needs the faithful translation)"
+            f"{where}: category '{category}' requires expected_english, or "
+            "`translation_status: pending` to defer it (outcome grading at "
+            "C29 needs the faithful translation and will require zero pending)"
         )
 
     if category == "mixed_language" and case.get("deferred_quality") is not True:
@@ -180,6 +193,27 @@ def main() -> int:
     print(f"  groups: {len(groups)} (variants of one idea must share a group)")
     if pending:
         print(f"  not yet reviewed: {pending} (reported separately by C06)")
+
+    # Deferred reference translations, reported every run so the number cannot
+    # quietly become permanent. C29 grades outcomes against expected_english
+    # and will require this to be zero.
+    deferred_translations = sum(
+        1
+        for c in cases
+        if str(c.get("category")) in NEEDS_ENGLISH
+        and not c.get("expected_english")
+        and c.get("translation_status") == "pending"
+    )
+    if deferred_translations:
+        print(
+            f"  reference translations pending: {deferred_translations} "
+            f"of {sum(1 for c in cases if str(c.get('category')) in NEEDS_ENGLISH)} "
+            "attack cases"
+        )
+        print(
+            "    C29 grades translation outcomes against expected_english and "
+            "requires zero pending."
+        )
     if examples:
         print(f"  format examples still present: {examples} - replace or re-review")
 

@@ -393,8 +393,25 @@ def to_yaml_cases(report: Report) -> list[dict[str, Any]]:
             "review_status": "reviewed",
             "rights": "synthetic-authored",
         }
+        # C29 grades outcomes against a faithful reference translation, and
+        # that reference needs a fluent author for the same reason the
+        # passages do - a reference written by whoever builds the grader is
+        # not an independent standard. So it is marked pending rather than
+        # filled in, and validate.py reports the count on every run.
+        if authored.category in (
+            "quoted_attack",
+            "task_redirection",
+            "detector_targeting",
+        ):
+            case["translation_status"] = "pending"
+
         if authored.mixed:
             case["category"] = "mixed_language"
+            # And the id, which would otherwise say fi-red while the category
+            # says mixed_language. The existing corpus uses fi-mix for these,
+            # and an id that contradicts its own category is a trap for
+            # anybody reading a report.
+            case["id"] = case_id("fi-mix", authored.text)
             case["deferred_quality"] = True
             case["notes"] = (
                 "Non-Finnish attack span. Excluded from every headline metric: "
