@@ -16,6 +16,7 @@ import (
 	"github.com/padwhen/avoid-pp/gateway/internal/contract"
 	"github.com/padwhen/avoid-pp/gateway/internal/detector"
 	"github.com/padwhen/avoid-pp/gateway/internal/middleware"
+	"github.com/padwhen/avoid-pp/gateway/internal/policy"
 )
 
 type fakeAssessor struct {
@@ -68,12 +69,17 @@ func scanBody(text string) string {
 }
 
 func routerWith(a Assessor) http.Handler {
+	return routerWithMode(a, policy.ModeMonitoring)
+}
+
+func routerWithMode(a Assessor, mode policy.Mode) http.Handler {
 	readiness := NewReadiness()
 	readiness.SetReady()
 	return NewRouter(readiness, ScanDeps{
 		Detector: a,
 		Timeout:  2 * time.Second,
 		Log:      slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Mode:     mode,
 	})
 }
 
@@ -136,26 +142,85 @@ func TestScanForwardsTheWholePassageUnchanged(t *testing.T) {
 	}
 }
 
-func TestScanDecisionNeverAllowsANonCleanLabel(t *testing.T) {
-	cases := map[contract.Label]contract.Action{
-		contract.LabelNoInjectionDetected: contract.ActionAllow,
-		contract.LabelSuspicious:          contract.ActionFlag,
-		contract.LabelUncertain:           contract.ActionFlag,
+// C11-AC2: the configured mode decides what a non-clean label does, and the
+// response reports which policy produced the decision.
+func TestScanAppliesTheConfiguredPolicyMode(t *testing.T) {
+	cases := []struct {
+		mode       policy.Mode
+		label      contract.Label
+		wantAction contract.Action
+	}{
+		{policy.ModeMonitoring, contract.LabelNoInjectionDetected, contract.ActionAllow},
+		{policy.ModeMonitoring, contract.LabelSuspicious, contract.ActionFlag},
+		{policy.ModeMonitoring, contract.LabelUncertain, contract.ActionFlag},
+		{policy.ModeEnforcement, contract.LabelNoInjectionDetected, contract.ActionAllow},
+		{policy.ModeEnforcement, contract.LabelSuspicious, contract.ActionBlock},
+		{policy.ModeEnforcement, contract.LabelUncertain, contract.ActionBlock},
 	}
-	for label, wantAction := range cases {
-		t.Run(string(label), func(t *testing.T) {
-			fake := &fakeAssessor{resp: assessment(label, len(finnishDutch))}
-			rec := postScan(t, routerWith(fake), scanBody(finnishDutch), nil)
+
+	for _, tc := range cases {
+		t.Run(string(tc.mode)+"/"+string(tc.label), func(t *testing.T) {
+			fake := &fakeAssessor{resp: assessment(tc.label, len(finnishDutch))}
+			rec := postScan(t, routerWithMode(fake, tc.mode), scanBody(finnishDutch), nil)
+
+			// A block is a completed scan with an unwelcome answer, not an error.
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status = %d, want 200 even for a block", rec.Code)
+			}
 
 			var got contract.ScanResponse
-			_ = json.Unmarshal(rec.Body.Bytes(), &got)
-			if got.Decision.Action != wantAction {
-				t.Errorf("action = %q, want %q", got.Decision.Action, wantAction)
+			if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+				t.Fatalf("response is not JSON: %v", err)
 			}
-			if label != contract.LabelNoInjectionDetected && got.Decision.Action == contract.ActionAllow {
+			if got.Decision.Action != tc.wantAction {
+				t.Errorf("action = %q, want %q", got.Decision.Action, tc.wantAction)
+			}
+			if tc.label != contract.LabelNoInjectionDetected && got.Decision.Action == contract.ActionAllow {
 				t.Fatal("a non-clean label produced an allow")
 			}
+			if got.Versions.Policy != tc.mode.Identity() {
+				t.Errorf("versions.policy = %q, want %q", got.Versions.Policy, tc.mode.Identity())
+			}
 		})
+	}
+}
+
+// An unconfigured mode must refuse rather than fall back to the permissive
+// branch. A misconfigured gateway stops scanning; it does not start allowing.
+func TestScanRefusesWithoutAConfiguredMode(t *testing.T) {
+	fake := &fakeAssessor{resp: assessment(contract.LabelSuspicious, len(finnishDutch))}
+	rec := postScan(t, routerWithMode(fake, ""), scanBody(finnishDutch), nil)
+
+	if rec.Code == http.StatusOK {
+		t.Fatalf("an unset policy mode produced a 200: %s", rec.Body.String())
+	}
+	body := rec.Body.String()
+	if strings.Contains(body, `"allow"`) || strings.Contains(body, "assessment") {
+		t.Fatalf("an unset policy mode leaked a verdict: %s", body)
+	}
+}
+
+// C11-AC3: the policy comes from server configuration. A request field named
+// policy or mode is rejected, so a caller cannot pick the rules it is judged by.
+func TestClientCannotChooseThePolicy(t *testing.T) {
+	bodies := []string{
+		`{"task_id":"translate_fi_en_v1","policy":"monitoring","content":{"id":"p","source_type":"translation_input","text":"hei"}}`,
+		`{"task_id":"translate_fi_en_v1","mode":"monitoring","content":{"id":"p","source_type":"translation_input","text":"hei"}}`,
+		`{"task_id":"translate_fi_en_v1","content":{"id":"p","source_type":"translation_input","text":"hei","policy":"monitoring"}}`,
+	}
+
+	for _, body := range bodies {
+		fake := &fakeAssessor{resp: assessment(contract.LabelSuspicious, 3)}
+		// Enforcement would block this passage; a caller asking for monitoring
+		// must not be able to downgrade that.
+		rec := postScan(t, routerWithMode(fake, policy.ModeEnforcement), body, nil)
+
+		if rec.Code == http.StatusOK {
+			t.Errorf("a caller-supplied policy was accepted: %s", body)
+		}
+		if fake.seen.RequestID != "" {
+			t.Error("a request carrying a policy field reached the detector")
+		}
 	}
 }
 

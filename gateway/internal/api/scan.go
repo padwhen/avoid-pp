@@ -12,6 +12,7 @@ import (
 	"github.com/padwhen/avoid-pp/gateway/internal/contract"
 	"github.com/padwhen/avoid-pp/gateway/internal/detector"
 	"github.com/padwhen/avoid-pp/gateway/internal/middleware"
+	"github.com/padwhen/avoid-pp/gateway/internal/policy"
 )
 
 // MaxRequestBytes bounds the public request body before any parsing.
@@ -28,6 +29,12 @@ type ScanDeps struct {
 	Detector Assessor
 	Timeout  time.Duration
 	Log      *slog.Logger
+
+	// Mode selects monitoring or enforcement. It comes from server
+	// configuration and is never read from a request, so a caller cannot
+	// choose the policy it is judged under. An empty value is rejected by
+	// the evaluator rather than defaulting to the permissive branch.
+	Mode policy.Mode
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {
@@ -41,22 +48,6 @@ func writeError(w http.ResponseWriter, r *http.Request, status int, code contrac
 		RequestID: middleware.RequestID(r.Context()),
 		Error:     contract.ErrorBody{Code: code, Message: message},
 	})
-}
-
-// decide maps an assessment to an action under monitoring semantics.
-//
-// Placeholder. C11 replaces this with a configurable evaluator supporting both
-// monitoring and enforcement. The invariant it must preserve is already here:
-// a label other than no_injection_detected never yields allow.
-func decide(label contract.Label) contract.Decision {
-	switch label {
-	case contract.LabelNoInjectionDetected:
-		return contract.Decision{Action: contract.ActionAllow, ReasonCode: contract.ReasonCleanCompleteScan}
-	case contract.LabelSuspicious:
-		return contract.Decision{Action: contract.ActionFlag, ReasonCode: contract.ReasonSuspiciousMonitored}
-	default:
-		return contract.Decision{Action: contract.ActionFlag, ReasonCode: contract.ReasonUncertainMonitored}
-	}
 }
 
 // Scan handles POST /v1/scans.
@@ -134,18 +125,29 @@ func Scan(deps ScanDeps) http.Handler {
 			return
 		}
 
+		decision, err := policy.Evaluate(deps.Mode, assessment.Assessment)
+		if err != nil {
+			// A label or mode the policy cannot evaluate is a failure, not a
+			// permissive default. The scan does not become an allow because
+			// the gateway did not understand the answer.
+			log.Error("policy could not evaluate the assessment",
+				"request_id", requestID, "error", err)
+			writeError(w, r, http.StatusServiceUnavailable,
+				contract.ErrCodeDetectorUnavailable, "Assessment could not be evaluated.")
+			return
+		}
+
 		writeJSON(w, http.StatusOK, contract.ScanResponse{
 			RequestID:  requestID,
 			ScanStatus: contract.ScanStatusComplete,
 			Assessment: assessment.Assessment,
-			Decision:   decide(assessment.Assessment.Label),
+			Decision:   decision,
 			Coverage:   assessment.Coverage,
 			Versions: contract.Versions{
 				Contract: contract.Version,
 				Detector: assessment.Versions.Detector,
 				Prompt:   assessment.Versions.Prompt,
-				// C11 replaces the placeholder evaluator and this label.
-				Policy: "monitoring-c09",
+				Policy:   deps.Mode.Identity(),
 			},
 		})
 	})
