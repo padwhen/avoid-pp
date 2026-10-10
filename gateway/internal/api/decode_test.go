@@ -497,6 +497,7 @@ func TestUnauthenticatedRequestsAreNotParsed(t *testing.T) {
 		Log:      slog.New(slog.NewTextHandler(io.Discard, nil)),
 		Mode:     policy.ModeMonitoring,
 		Callers:  registry,
+		Limiter:  permissiveLimits(t, "only"),
 	})
 
 	// A body that would be a 400, plus no credential: the 401 must win.

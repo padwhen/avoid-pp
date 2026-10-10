@@ -167,6 +167,13 @@ authentication
   ok    valid credential -> HTTP 200
   ok    unauthenticated GET /healthz -> 200
   ok    unauthenticated GET /readyz -> 200
+rate limiting
+  ok    sustained traffic -> 39 admitted, 21 of 60 rate limited
+  ok    429 carries a Retry-After header
+  ok    429 carries retry_after_seconds in the body
+  ok    429 does not disclose which bucket was hit
+  ok    GET /healthz -> 200 with buckets drained
+  ok    GET /readyz -> 200 with buckets drained
 ```
 
 There is no default key in this repository. `make dev-key` generates one per
@@ -348,6 +355,53 @@ levels of nesting. The smallest binds first, and the boundary tests say which
 one fired.
 
 See [C20 acceptance criteria](docs/c20-request-validation.md).
+
+## Rate limits
+
+Three buckets, all allocated at startup: one per configured caller, one shared
+by authenticated traffic, one shared by *all* unauthenticated traffic.
+
+Nothing is created per request, and that is the point. The usual shape of a
+rate limiter is a map filled in on first sight of a key — and if the key is
+anything the caller controls, sending a million distinct values allocates a
+million buckets. The thing meant to bound load becomes the thing that fails
+under it. Here the caller buckets come from configuration, which only a
+restart can change, and unauthenticated traffic is keyed by nothing at all.
+
+The cost of one shared unauthenticated bucket is that a flood from a single
+source exhausts it for every other unrecognised caller. That is acceptable:
+legitimate traffic is authenticated and unaffected, and the visible
+consequence is 429 rather than 401, which discloses less.
+
+There is no eviction, because there is nothing to evict. If callers ever
+become dynamic, that stops being true — and the test asserting the bucket
+count never changes is what will fail.
+
+A refused request consumes nothing. Both buckets are reserved and both
+cancelled if either refuses, so a caller refused by the shared limit does not
+also pay from its own — otherwise one busy caller would throttle another
+twice over, and the second effect would outlast the first invisibly.
+
+```text
+$ for i in $(seq 8); do ...; done     # burst 5
+1: 200  2: 200  3: 200  4: 200  5: 200  6: 429  7: 429  8: 429
+
+HTTP/1.1 429 Too Many Requests
+Retry-After: 1
+{"error":{"code":"rate_limited","retry_after_seconds":1, ...}}
+```
+
+The hint is computed from the bucket, not guessed, and rounds up — honouring
+it succeeds on the first retry. It never says *which* bucket was hit: that
+would disclose that other callers are busy. The scope goes to the log.
+
+Limits are **per process**: two replicas admit twice the configured rate. The
+defaults are sized from what a scan costs rather than from web-service habit —
+roughly a cent per scan, so the global default caps a runaway loop near a
+dollar a minute. `make up` and `make run-gateway` loosen them for local
+verification and say so.
+
+See [C21 acceptance criteria](docs/c21-rate-limits.md).
 
 ## Running the detector
 

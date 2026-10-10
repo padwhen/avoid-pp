@@ -4,6 +4,19 @@ UV ?= uv
 
 # Local run defaults. 8080 is the gateway's own default, but is often taken by
 # another service (nginx, for one), so the convenience target uses 8099.
+# Rate limits for the convenience targets only.
+#
+# The shipped defaults (1/5 per caller) are a spend bound sized for a service
+# calling a paid model, and they are far too tight to run a verification suite
+# through: `make smoke` makes about a dozen authenticated requests in a second.
+# So the local targets loosen them and say so, while a deployment that sets
+# nothing still gets the tight defaults from config.go.
+#
+# An AVOIDPP_RATE_* already set in the environment or .env wins over these.
+DEV_RATE_CALLER ?= 20/40
+DEV_RATE_GLOBAL ?= 40/80
+DEV_RATE_UNAUTH ?= 20/40
+
 ADDR ?= :8099
 DETECTOR_URL ?= http://localhost:9000
 DETECTOR_HOST ?= 127.0.0.1
@@ -78,7 +91,11 @@ dev-key:
 run-gateway:
 	@test -f .env || { echo 'no .env; run `make dev-key` first' >&2; exit 1; }
 	cd gateway && set -a && . ../.env && set +a && \
-	  AVOIDPP_ADDR=$(ADDR) AVOIDPP_DETECTOR_URL=$(DETECTOR_URL) $(GO) run ./cmd/server
+	  AVOIDPP_ADDR=$(ADDR) AVOIDPP_DETECTOR_URL=$(DETECTOR_URL) \
+	  AVOIDPP_RATE_CALLER=$${AVOIDPP_RATE_CALLER:-$(DEV_RATE_CALLER)} \
+	  AVOIDPP_RATE_GLOBAL=$${AVOIDPP_RATE_GLOBAL:-$(DEV_RATE_GLOBAL)} \
+	  AVOIDPP_RATE_UNAUTHENTICATED=$${AVOIDPP_RATE_UNAUTHENTICATED:-$(DEV_RATE_UNAUTH)} \
+	  $(GO) run ./cmd/server
 
 run-detector:
 	cd detector && $(UV) run --locked --no-sync uvicorn translation_guard.api:app \
@@ -86,6 +103,13 @@ run-detector:
 
 up:
 	@test -f .env || { echo 'no .env; run `make dev-key` first' >&2; exit 1; }
+	@printf 'rate limits for local use: caller %s, global %s, unauthenticated %s\n' \
+	  "$${AVOIDPP_RATE_CALLER:-$(DEV_RATE_CALLER)}" \
+	  "$${AVOIDPP_RATE_GLOBAL:-$(DEV_RATE_GLOBAL)}" \
+	  "$${AVOIDPP_RATE_UNAUTHENTICATED:-$(DEV_RATE_UNAUTH)}"
+	AVOIDPP_RATE_CALLER=$${AVOIDPP_RATE_CALLER:-$(DEV_RATE_CALLER)} \
+	AVOIDPP_RATE_GLOBAL=$${AVOIDPP_RATE_GLOBAL:-$(DEV_RATE_GLOBAL)} \
+	AVOIDPP_RATE_UNAUTHENTICATED=$${AVOIDPP_RATE_UNAUTHENTICATED:-$(DEV_RATE_UNAUTH)} \
 	docker compose up -d --build
 	@printf 'gateway: http://localhost:%s\n' "$${AVOIDPP_HOST_PORT:-8099}"
 

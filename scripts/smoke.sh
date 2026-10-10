@@ -196,6 +196,77 @@ for path in healthz readyz; do
 done
 
 echo
+echo "rate limiting"
+
+# The configured limits are low on purpose, so this section both proves the
+# limiter works and leaves the buckets drained - which is why it runs last.
+burst_probe() {
+    local label="$1" attempts="$2" header="$3"
+    local statuses="" i status args
+    for i in $(seq "$attempts"); do
+        args=(-sS -o /dev/null -m 15 -w '%{http_code}' -X POST "$SCAN"
+              -H 'Content-Type: application/json'
+              -d "$(body_for "p-rate-$i" '"hei vaan"')")
+        if [ -n "$header" ]; then
+            args+=(-H "Authorization: $header")
+        fi
+        status="$(curl "${args[@]}")"
+        statuses="$statuses $status"
+    done
+    printf '%s' "$statuses"
+}
+
+# Enough requests to exceed the burst the local targets configure (40). A
+# deployment using the shipped defaults would be refused far sooner, which is
+# fine: this asserts that the limiter binds, not where.
+PROBE="${SMOKE_RATE_PROBE:-60}"
+results="$(burst_probe "authenticated" "$PROBE" "Bearer $API_KEY")"
+limited_count="$(printf '%s' "$results" | tr ' ' '\n' | grep -c '^429$' || true)"
+ok_count="$(printf '%s' "$results" | tr ' ' '\n' | grep -c '^200$' || true)"
+if [ "$limited_count" -gt 0 ]; then
+    pass "sustained traffic -> $ok_count admitted, $limited_count of $PROBE rate limited"
+else
+    fail "$PROBE rapid requests produced no 429; the limiter is not binding"
+fi
+
+# The 429 must carry retry guidance in both the header and the body.
+response="$(curl -sS -m 15 -D - -X POST "$SCAN" \
+    -H 'Content-Type: application/json' -H "$AUTH" \
+    -d "$(body_for p-rate-hdr '"hei vaan"')")"
+status="$(printf '%s' "$response" | sed -n 's|^HTTP/[0-9.]* \([0-9]*\).*|\1|p' | head -1)"
+if [ "$status" = "429" ]; then
+    if printf '%s' "$response" | grep -qi '^retry-after: *[1-9]'; then
+        pass "429 carries a Retry-After header"
+    else
+        fail "429 has no usable Retry-After header"
+    fi
+    if printf '%s' "$response" | grep -q '"retry_after_seconds":[1-9]'; then
+        pass "429 carries retry_after_seconds in the body"
+    else
+        fail "429 has no retry_after_seconds in the body"
+    fi
+    # The refusal must not say which bucket was hit.
+    if printf '%s' "$response" | grep -qiE '"message":[^}]*(global|other caller|tenant)'; then
+        fail "429 message discloses the limiter scope"
+    else
+        pass "429 does not disclose which bucket was hit"
+    fi
+else
+    fail "expected the bucket to still be drained, got HTTP $status"
+fi
+
+# Health must stay reachable even with every bucket drained: a readiness probe
+# that fails because it polled too often would cause the outage it prevents.
+for path in healthz readyz; do
+    status="$(curl -sS -o /dev/null -m 10 -w '%{http_code}' "$BASE/$path")"
+    if [ "$status" = "200" ]; then
+        pass "GET /$path -> 200 with buckets drained"
+    else
+        fail "GET /$path -> HTTP $status with buckets drained, want 200"
+    fi
+done
+
+echo
 if [ "$failures" -eq 0 ]; then
     echo "smoke: all checks passed"
 else

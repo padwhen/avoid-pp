@@ -18,6 +18,7 @@ import (
 	"github.com/padwhen/avoid-pp/gateway/internal/auth"
 	"github.com/padwhen/avoid-pp/gateway/internal/config"
 	"github.com/padwhen/avoid-pp/gateway/internal/detector"
+	"github.com/padwhen/avoid-pp/gateway/internal/limits"
 	"github.com/padwhen/avoid-pp/gateway/internal/server"
 )
 
@@ -49,6 +50,20 @@ func run() error {
 		"configured_keys", cfg.Callers.KeyCount(),
 	)
 
+	// One bucket per configured caller plus two shared ones, all allocated
+	// here. Nothing is created per request, so this is the whole of the
+	// limiter's memory for the life of the process.
+	callers := make([]string, 0, len(cfg.Callers.Callers()))
+	for _, caller := range cfg.Callers.Callers() {
+		callers = append(callers, caller.Name)
+	}
+	limiter, err := limits.New(cfg.Rates, callers)
+	if err != nil {
+		return fmt.Errorf("rate limits: %w", err)
+	}
+	log.Info("rate limits configured",
+		"rates", limiter.Describe(), "buckets", limiter.BucketCount())
+
 	readiness := api.NewReadiness()
 
 	// One client, reused for every scan: a per-request client would discard
@@ -63,6 +78,7 @@ func run() error {
 			Log:      log,
 			Mode:     cfg.PolicyMode,
 			Callers:  cfg.Callers,
+			Limiter:  limiter,
 		}),
 		Drain: cfg.ShutdownTimeout,
 		Log:   log,

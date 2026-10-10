@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/padwhen/avoid-pp/gateway/internal/auth"
+	"github.com/padwhen/avoid-pp/gateway/internal/limits"
 	"github.com/padwhen/avoid-pp/gateway/internal/policy"
 )
 
@@ -63,6 +64,10 @@ type Config struct {
 	// Callers is the authenticated caller set. It holds key digests, not
 	// keys, so a Config that reaches a log or a dump carries no credential.
 	Callers *auth.Registry
+
+	// Rates bounds how fast requests may arrive. The buckets are allocated
+	// from Callers at startup, so the limiter's state cannot grow.
+	Rates limits.Config
 }
 
 // Getenv matches os.Getenv and is injected so tests need no process state.
@@ -137,6 +142,12 @@ func Load(getenv Getenv) (*Config, error) {
 		problems = append(problems, fmt.Errorf("%s: %w", EnvAPIKeys, err))
 	} else {
 		cfg.Callers = registry
+	}
+
+	if rates, err := parseRates(getenv); err != nil {
+		problems = append(problems, err)
+	} else {
+		cfg.Rates = rates
 	}
 
 	if !logLevels[cfg.LogLevel] {
