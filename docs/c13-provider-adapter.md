@@ -130,3 +130,75 @@ input token budget (C16), no retries or deadline propagation (C17), no
 diagnostics (C18). The live smoke is four passages, not an evaluation — running
 the C06 runner against the live detector over the 73-case corpus is the obvious
 next step, and it costs real money.
+
+## First live evaluation
+
+Run after the adapter landed, over the full C05 corpus:
+
+```sh
+make live-eval CONFIRM=yes
+```
+
+```
+TP 23   FN 0   FP 0   TN 45   uncertain 0   error 0
+conditional : recall 1.0   fpr 0.0   precision 1.0
+cost        : 73 requests, 85223 in / 14090 out, $0.78
+wall clock  : 59.4s at concurrency 5
+```
+
+| Detector | recall | fpr | precision |
+| --- | --- | --- | --- |
+| keyword fake | 0.22 | 0.18 | 0.38 |
+| `claude-opus-5` | 1.00 | 0.00 | 1.00 |
+
+All ten quoted attacks were correctly allowed, which is the distinction the
+project exists to make and the one the keyword baseline fails.
+
+The saved report is `evals/reports/milestones/c13-live-claude-opus-5.json`. It
+records the dataset hash, detector identity, prompt version and per-case
+outcomes, so the number can be reproduced or disputed later. Working runs stay
+gitignored; milestone reports are evidence.
+
+### A perfect score is not a verified one
+
+```
+23/23 attacks caught  ->  recall >= 85.2%   (95% Clopper-Pearson)
+45/45 benign passed   ->  fpr    <=  7.9%
+```
+
+The C30 gate is recall >= 90% and fpr <= 1%. **A flawless run at this sample
+size clears neither bound.** What a perfect run would need:
+
+| n | recall lower bound | fpr upper bound |
+| --- | --- | --- |
+| 23 | 85.2% | 14.8% |
+| 45 | 92.1% | 7.9% |
+| 100 | 96.4% | 3.6% |
+| 300 | 98.8% | 1.2% |
+
+So roughly 300 benign cases before a perfect run can defend a 1% claim.
+
+### The corpus can no longer measure progress
+
+There is no headroom above 100%, so every prompt change from here scores
+identically and C14 has nothing to tune against. That makes C26 the blocking
+item, and not simply for volume: the corpus needs **harder** cases — the long,
+polite, plausible attacks it currently lacks, genuine ambiguity, and the
+mixed-language set that is still deferred.
+
+### Two defects this run found
+
+Both were only reachable by spending money, which is the argument for having
+done it.
+
+- **A schema violation escaped `assess()`.** The model returned a `reasoning`
+  longer than the field's cap and the resulting `ValidationError` propagated
+  as an unhandled exception, crashing the request path instead of returning
+  503. Error handling covered the provider's API exceptions but not parse
+  failures. Any unexpected failure now maps to `DetectorUnavailable`, with
+  `CancelledError` deliberately re-raised, and the bound on an advisory field
+  no longer fails a whole assessment.
+- **The report labelled the live run `fake:`.** `build_report` hardcoded that
+  prefix, so the first real evaluation was recorded as a fake detector. An
+  evaluation record that misattributes what produced it is worse than none.
+  Identity is now passed verbatim.
