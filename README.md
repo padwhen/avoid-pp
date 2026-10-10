@@ -588,6 +588,44 @@ another split means the holdout measures memorisation.
 
 See [C26 acceptance criteria](docs/c26-splits-and-holdout.md).
 
+## The translator being protected
+
+`examples/protected_translator/` is a Finnish-to-English translator, isolated
+by construction. The guard exists to protect something, and this is that
+something — in the repository so the integration is wired against working code
+rather than described in prose.
+
+What makes it isolated is what it cannot do. The provider request has exactly
+four keys and no `tools` — asserted as *absence*, since an empty tool list is
+still a tool parameter. It holds one secret. `translate()` takes the source
+text and a request id, and that is the whole signature, so a caller cannot ask
+for a different target language.
+
+The source goes in a delimited user message with the instructions in the
+system prompt, and a test asserts the passage never appears in the
+instructions.
+
+Rendering escapes for HTML, because **a faithful translation of hostile input
+is still hostile input**. That is a different safety question from the one the
+detector answers: `<script>` in ordinary Finnish prose is not a prompt
+injection and the detector should not flag it, yet rendering it as markup is
+still a cross-site scripting hole.
+
+```text
+source:       Ilmatieteen laitos ennustaa viikonlopuksi räntäsateita...
+translation:  The Finnish Meteorological Institute forecasts sleet...
+              1700ms, 329 in / 70 out
+```
+
+The live run also found something that changes the integration. The
+embedded-Dutch preservation case returns `stop_reason: refusal` — the
+provider's own safety system declines to translate it, even though the
+detector correctly labels it as material to translate. **An allow decision
+does not guarantee a translation**, so there are three outcomes to handle and
+not two: blocked, translated, and allowed-but-not-translatable.
+
+See [C27 acceptance criteria](docs/c27-translator.md).
+
 ## Running the detector
 
 ```sh
