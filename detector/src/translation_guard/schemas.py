@@ -136,6 +136,9 @@ class Versions(BaseModel):
 
     detector: Annotated[str, Field(min_length=1)]
     prompt: Annotated[str, Field(min_length=1)]
+    # A version name cannot prove which prompt bytes ran, and a report is a
+    # claim about exact bytes.
+    prompt_fingerprint: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")] | None = None
 
 
 class Diagnostics(BaseModel):
@@ -148,6 +151,10 @@ class Diagnostics(BaseModel):
     latency_ms: Annotated[int, Field(ge=0)] | None = None
     input_tokens: Annotated[int, Field(ge=0)] | None = None
     output_tokens: Annotated[int, Field(ge=0)] | None = None
+    # Provider requests made, retries included. Bounds what the scan cost.
+    attempts: Annotated[int, Field(ge=1)] | None = None
+    # Part of the inference settings a result must be attributable to.
+    max_tokens: Annotated[int, Field(ge=1)] | None = None
 
 
 class AssessmentResponse(BaseModel):

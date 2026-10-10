@@ -37,7 +37,13 @@ from translation_guard import prompts, retry
 from translation_guard.detectors.base import Detector, DetectorUnavailable
 from translation_guard.limits import Budget, InputTooLarge
 from translation_guard.limits import check as check_limits
-from translation_guard.schemas import Assessment, Category, Content, Label
+from translation_guard.schemas import (
+    Assessment,
+    Category,
+    Content,
+    Diagnostics,
+    Label,
+)
 from translation_guard.validation import InvalidModelOutput, validate
 
 logger = logging.getLogger("translation_guard.claude")
@@ -106,10 +112,25 @@ class ClaudeDetector(Detector):
         # a run actually cost instead of estimating it.
         self._on_usage = on_usage
         self._client: anthropic.AsyncAnthropic | None = None
+        self._last_diagnostics: Diagnostics | None = None
 
     @property
     def identity(self) -> str:
         return self._identity
+
+    @property
+    def last_diagnostics(self) -> Diagnostics | None:
+        """Diagnostics from the most recent assessment, or None."""
+        return self._last_diagnostics
+
+    @property
+    def prompt_fingerprint(self) -> str:
+        """SHA-256 of the prompt bytes actually in use."""
+        return self._prompt.fingerprint()
+
+    @property
+    def max_tokens(self) -> int:
+        return self._max_tokens
 
     @property
     def prompt_version(self) -> str:
@@ -160,8 +181,13 @@ class ClaudeDetector(Detector):
             request_timeout = min(self._timeout, max(deadline_ms / 1000.0, 0.1))
 
         started = time.monotonic()
+        attempts = 0
+        # Per-assessment, so a concurrent scan cannot read another's numbers.
+        usage: dict[str, int] = {}
 
         async def attempt(remaining: float) -> Any:
+            nonlocal attempts
+            attempts += 1
             """One provider call, bounded by what is left of the budget."""
             assert self._client is not None
             try:
@@ -225,12 +251,27 @@ class ClaudeDetector(Detector):
 
         elapsed_ms = int((time.monotonic() - started) * 1000)
 
-        usage = getattr(response, "usage", None)
-        if self._on_usage is not None and usage is not None:
-            self._on_usage(
-                getattr(usage, "input_tokens", 0) or 0,
-                getattr(usage, "output_tokens", 0) or 0,
-            )
+        reported = getattr(response, "usage", None)
+        if reported is not None:
+            # Absent, never zero: reporting an unknown token count as 0 would
+            # quietly understate cost in every report that aggregates it.
+            for field in ("input_tokens", "output_tokens"):
+                value = getattr(reported, field, None)
+                if isinstance(value, int):
+                    usage[field] = value
+            if self._on_usage is not None:
+                self._on_usage(
+                    usage.get("input_tokens", 0), usage.get("output_tokens", 0)
+                )
+
+        self._last_diagnostics = Diagnostics(
+            model=self._model,
+            latency_ms=elapsed_ms,
+            input_tokens=usage.get("input_tokens"),
+            output_tokens=usage.get("output_tokens"),
+            attempts=attempts,
+            max_tokens=self._max_tokens,
+        )
 
         # A safety refusal is not an assessment. Treating it as clean would
         # turn the model declining to answer into permission to continue.

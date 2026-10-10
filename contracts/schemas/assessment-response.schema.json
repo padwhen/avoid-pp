@@ -5,29 +5,76 @@
   "description": "Detector -> gateway. An assessment and the evidence for it, with no decision attached. There is deliberately no confidence number: an LLM-invented probability is not calibrated and must not be presented as if it were.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["request_id", "assessment", "coverage", "versions"],
+  "required": [
+    "request_id",
+    "assessment",
+    "coverage",
+    "versions"
+  ],
   "properties": {
-    "request_id": { "$ref": "common.schema.json#/$defs/request_id" },
-    "assessment": { "$ref": "common.schema.json#/$defs/assessment" },
-    "coverage": { "$ref": "common.schema.json#/$defs/coverage" },
+    "request_id": {
+      "$ref": "common.schema.json#/$defs/request_id"
+    },
+    "assessment": {
+      "$ref": "common.schema.json#/$defs/assessment"
+    },
+    "coverage": {
+      "$ref": "common.schema.json#/$defs/coverage"
+    },
     "versions": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["detector", "prompt"],
+      "required": [
+        "detector",
+        "prompt"
+      ],
       "properties": {
-        "detector": { "type": "string", "minLength": 1 },
-        "prompt": { "type": "string", "minLength": 1 }
+        "detector": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prompt_fingerprint": {
+          "description": "SHA-256 of the prompt that produced this assessment. A version name alone cannot prove which bytes ran.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
       }
     },
     "diagnostics": {
-      "description": "Optional, non-authoritative. Unknown provider usage is reported as absent, never as zero.",
+      "description": "Non-authoritative, for evaluation and cost accounting. Every field is optional: unknown provider usage is ABSENT, never zero, because reporting an unknown token count as 0 would quietly understate cost. There is deliberately no confidence field - an LLM-invented probability is not calibrated and must not be rendered as though it were.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "model": { "type": "string", "minLength": 1 },
-        "latency_ms": { "type": "integer", "minimum": 0 },
-        "input_tokens": { "type": "integer", "minimum": 0 },
-        "output_tokens": { "type": "integer", "minimum": 0 }
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "latency_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "input_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "output_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "attempts": {
+          "description": "Provider requests made for this assessment, including retries. Bounds what the scan actually cost.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_tokens": {
+          "description": "Output ceiling the request was made with. Part of the inference settings a result must be attributable to.",
+          "type": "integer",
+          "minimum": 1
+        }
       }
     }
   }

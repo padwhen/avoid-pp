@@ -213,7 +213,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     if resolved.mode is DetectorMode.LIVE
                     else resolved.prompt_version
                 ),
+                prompt_fingerprint=getattr(state.detector, "prompt_fingerprint", None),
             ),
+            # Non-authoritative. Present only when the detector produced any;
+            # the fake has none, and an absent block is honest about that.
+            diagnostics=getattr(state.detector, "last_diagnostics", None),
         )
 
     return app
