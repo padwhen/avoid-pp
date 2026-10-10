@@ -136,7 +136,11 @@ async def assess_all(
 # figure as a floor when there were any.
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    # argv is a parameter rather than read from sys.argv so the spend-guard
+    # self-test can invoke this in-process and assert it refuses. A guard
+    # that can only be exercised by running the real thing is a guard nobody
+    # exercises.
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--confirm", action="store_true")
     parser.add_argument("--model", default=None)
@@ -152,7 +156,7 @@ def main() -> int:
         action="store_true",
         help="required to evaluate the holdout; the access is logged",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     settings = Settings()
     model = args.model or settings.model

@@ -94,6 +94,11 @@ jobs:
       - name: Duplicate and leakage review
         run: make check-duplicates
 
+      # A paid tool that runs without confirmation is a bug that costs money.
+      # One did, so the guard now has a test.
+      - name: Spend guards
+        run: make check-spend-guards
+
       # C04-AC3: nothing above may depend on a provider credential. Asserted
       # rather than asserted-in-prose, so adding one to this workflow fails.
       - name: No provider credentials required
