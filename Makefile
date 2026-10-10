@@ -10,7 +10,7 @@ DETECTOR_HOST ?= 127.0.0.1
 DETECTOR_PORT ?= 9000
 
 .DEFAULT_GOAL := help
-.PHONY: help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner run-gateway run-detector
+.PHONY: help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner run-gateway run-detector up down logs smoke
 
 help:
 	@printf '%s\n' \
@@ -23,7 +23,11 @@ help:
 	  'make check-evals      Validate the Finnish seed dataset and report progress' \
 	  'make check-evals-runner  Assert the evaluation runner against a hand-calculated fixture' \
 	  'make run-gateway   Run the gateway locally (override ADDR= and DETECTOR_URL=)' \
-	  'make run-detector  Run the detector locally in fake mode (no API key)'
+	  'make run-detector  Run the detector locally in fake mode (no API key)' \
+	  'make up            Build and start both services with Compose' \
+	  'make smoke         Exercise the running stack and assert the responses' \
+	  'make logs          Follow Compose logs' \
+	  'make down          Stop and remove the Compose stack'
 
 bootstrap: bootstrap-go bootstrap-python
 
@@ -68,3 +72,16 @@ run-gateway:
 run-detector:
 	cd detector && $(UV) run --locked --no-sync uvicorn translation_guard.api:app \
 	  --host $(DETECTOR_HOST) --port $(DETECTOR_PORT)
+
+up:
+	docker compose up -d --build
+	@printf 'gateway: http://localhost:%s\n' "$${AVOIDPP_HOST_PORT:-8099}"
+
+smoke:
+	./scripts/smoke.sh http://localhost:$${AVOIDPP_HOST_PORT:-8099}
+
+logs:
+	docker compose logs -f
+
+down:
+	docker compose down -v
