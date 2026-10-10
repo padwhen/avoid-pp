@@ -25,6 +25,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from translation_guard.admission import Admission, AtCapacity
 from translation_guard.config import DetectorMode, Settings
 from translation_guard.detectors import (
     ClaudeDetector,
@@ -53,6 +54,7 @@ class State:
     detector: Detector | None = None
     ready: bool = False
     init_error: str | None = field(default=None)
+    admission: Admission | None = None
 
 
 def build_detector(settings: Settings) -> Detector:
@@ -89,12 +91,43 @@ def error_response(
     return JSONResponse(status_code=http_status, content=body.model_dump(mode="json"))
 
 
+def retryable_error_response(
+    request_id: str,
+    code: str,
+    message: str,
+    http_status: int,
+    retry_after_seconds: int,
+) -> JSONResponse:
+    """An error envelope carrying retry guidance in the header and the body.
+
+    Both, for the same reason the gateway does it: a header is what proxies
+    honour automatically, and the body field is what a client library that
+    hides response headers on an error path can still read.
+    """
+    body = ErrorResponse(
+        request_id=request_id or "unknown",
+        error=ErrorBody(
+            code=code, message=message, retry_after_seconds=retry_after_seconds
+        ),
+    )
+    return JSONResponse(
+        status_code=http_status,
+        content=body.model_dump(mode="json", exclude_none=True),
+        headers={"Retry-After": str(retry_after_seconds)},
+    )
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     resolved = settings or Settings()
     state = State(settings=resolved)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        state.admission = Admission(
+            max_active=resolved.max_active, max_waiting=resolved.max_waiting
+        )
+        logger.info("admission configured: %s", state.admission.describe())
+
         detector = build_detector(resolved)
         try:
             await detector.start()
@@ -174,9 +207,33 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
+        if state.admission is None:
+            # Unreachable once lifespan has run. Refusing rather than calling
+            # the provider unbounded keeps a startup-ordering mistake from
+            # becoming an unbounded spend.
+            return error_response(
+                payload.request_id,
+                "detector_unavailable",
+                "Detector is not available.",
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
         try:
-            assessment = await state.detector.assess(
-                payload.content, payload.deadline_ms
+            # The slot is held only for the provider call. Coverage accounting
+            # and serialisation below do not need capacity.
+            async with state.admission.slot():
+                assessment = await state.detector.assess(
+                    payload.content, payload.deadline_ms
+                )
+        except AtCapacity:
+            # Shed rather than queue without limit. A 503 now is better
+            # information than a response that may arrive in two minutes.
+            return retryable_error_response(
+                payload.request_id,
+                "overloaded",
+                "The detector is at capacity.",
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                retry_after_seconds=1,
             )
         except DetectorUnavailable:
             return error_response(

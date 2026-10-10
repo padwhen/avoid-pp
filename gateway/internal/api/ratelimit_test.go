@@ -49,12 +49,13 @@ func limitedRouter(t *testing.T, cfg limits.Config) (http.Handler, *countingAsse
 	readiness := NewReadiness()
 	readiness.SetReady()
 	return NewRouter(readiness, ScanDeps{
-		Detector: counter,
-		Timeout:  2 * time.Second,
-		Log:      slog.New(slog.NewTextHandler(io.Discard, nil)),
-		Mode:     policy.ModeMonitoring,
-		Callers:  registry,
-		Limiter:  limiter,
+		Detector:  counter,
+		Timeout:   2 * time.Second,
+		Log:       slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Mode:      policy.ModeMonitoring,
+		Callers:   registry,
+		Limiter:   limiter,
+		Admission: permissiveAdmission(),
 	}), counter
 }
 
@@ -349,11 +350,12 @@ func TestScanRouteIsAbsentWithoutALimiter(t *testing.T) {
 	readiness := NewReadiness()
 	readiness.SetReady()
 	router := NewRouter(readiness, ScanDeps{
-		Detector: counter,
-		Timeout:  time.Second,
-		Log:      slog.New(slog.NewTextHandler(io.Discard, nil)),
-		Mode:     policy.ModeMonitoring,
-		Callers:  registry,
+		Detector:  counter,
+		Timeout:   time.Second,
+		Log:       slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Mode:      policy.ModeMonitoring,
+		Callers:   registry,
+		Admission: permissiveAdmission(),
 		// Limiter deliberately nil.
 	})
 

@@ -100,12 +100,13 @@ func matrixRouter(t *testing.T) (http.Handler, *countingAssessor) {
 	readiness := NewReadiness()
 	readiness.SetReady()
 	return NewRouter(readiness, ScanDeps{
-		Detector: counter,
-		Timeout:  2 * time.Second,
-		Log:      slog.New(slog.NewTextHandler(io.Discard, nil)),
-		Mode:     policy.ModeMonitoring,
-		Callers:  registry,
-		Limiter:  permissiveLimits(t, "authorised", "second-caller"),
+		Detector:  counter,
+		Timeout:   2 * time.Second,
+		Log:       slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Mode:      policy.ModeMonitoring,
+		Callers:   registry,
+		Limiter:   permissiveLimits(t, "authorised", "second-caller"),
+		Admission: permissiveAdmission(),
 	}), counter
 }
 
@@ -336,11 +337,12 @@ func TestScanRouteIsAbsentWithoutARegistry(t *testing.T) {
 	readiness.SetReady()
 	counter := &countingAssessor{}
 	router := NewRouter(readiness, ScanDeps{
-		Detector: counter,
-		Timeout:  time.Second,
-		Log:      slog.New(slog.NewTextHandler(io.Discard, nil)),
-		Mode:     policy.ModeMonitoring,
-		Limiter:  permissiveLimits(t, "authorised"),
+		Detector:  counter,
+		Timeout:   time.Second,
+		Log:       slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Mode:      policy.ModeMonitoring,
+		Limiter:   permissiveLimits(t, "authorised"),
+		Admission: permissiveAdmission(),
 		// Callers deliberately nil.
 	})
 

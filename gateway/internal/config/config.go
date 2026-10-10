@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/padwhen/avoid-pp/gateway/internal/admission"
 	"github.com/padwhen/avoid-pp/gateway/internal/auth"
 	"github.com/padwhen/avoid-pp/gateway/internal/limits"
 	"github.com/padwhen/avoid-pp/gateway/internal/policy"
@@ -68,6 +69,10 @@ type Config struct {
 	// Rates bounds how fast requests may arrive. The buckets are allocated
 	// from Callers at startup, so the limiter's state cannot grow.
 	Rates limits.Config
+
+	// Admission bounds how much inference runs at once, which is a different
+	// question from how fast requests arrive.
+	Admission admission.Config
 }
 
 // Getenv matches os.Getenv and is injected so tests need no process state.
@@ -148,6 +153,12 @@ func Load(getenv Getenv) (*Config, error) {
 		problems = append(problems, err)
 	} else {
 		cfg.Rates = rates
+	}
+
+	if adm, err := parseAdmission(getenv); err != nil {
+		problems = append(problems, err)
+	} else {
+		cfg.Admission = adm
 	}
 
 	if !logLevels[cfg.LogLevel] {

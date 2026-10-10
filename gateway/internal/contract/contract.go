@@ -105,6 +105,7 @@ const (
 	ErrCodePayloadTooLarge     ErrorCode = "payload_too_large"
 	ErrCodeUnsupportedMedia    ErrorCode = "unsupported_media_type"
 	ErrCodeRateLimited         ErrorCode = "rate_limited"
+	ErrCodeOverloaded          ErrorCode = "overloaded"
 	ErrCodeDetectorUnavailable ErrorCode = "detector_unavailable"
 	ErrCodeDeadlineExceeded    ErrorCode = "deadline_exceeded"
 	ErrCodeInternalError       ErrorCode = "internal_error"

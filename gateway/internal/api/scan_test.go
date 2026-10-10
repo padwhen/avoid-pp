@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/padwhen/avoid-pp/gateway/internal/admission"
 	"github.com/padwhen/avoid-pp/gateway/internal/auth"
 	"github.com/padwhen/avoid-pp/gateway/internal/contract"
 	"github.com/padwhen/avoid-pp/gateway/internal/detector"
@@ -78,12 +79,13 @@ func routerWithMode(a Assessor, mode policy.Mode) http.Handler {
 	readiness := NewReadiness()
 	readiness.SetReady()
 	return NewRouter(readiness, ScanDeps{
-		Detector: a,
-		Timeout:  2 * time.Second,
-		Log:      slog.New(slog.NewTextHandler(io.Discard, nil)),
-		Mode:     mode,
-		Callers:  testRegistry(),
-		Limiter:  permissiveLimitsFor("tests"),
+		Detector:  a,
+		Timeout:   2 * time.Second,
+		Log:       slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Mode:      mode,
+		Callers:   testRegistry(),
+		Limiter:   permissiveLimitsFor("tests"),
+		Admission: permissiveAdmission(),
 	})
 }
 
@@ -101,6 +103,17 @@ func permissiveLimitsFor(callers ...string) *limits.Limiter {
 		panic(err)
 	}
 	return limiter
+}
+
+// permissiveAdmission is wide enough that no behaviour test is accidentally
+// about admission control. The controller's own behaviour is tested in
+// admission_test.go and in the load fixture, against tight bounds.
+func permissiveAdmission() *admission.Controller {
+	controller, err := admission.New(admission.Config{MaxActive: 1000, MaxQueued: 1000})
+	if err != nil {
+		panic(err)
+	}
+	return controller
 }
 
 func testRegistry() *auth.Registry {

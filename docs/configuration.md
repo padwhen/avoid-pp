@@ -17,6 +17,8 @@ trusting it.
 | `AVOIDPP_RATE_CALLER` | no | `1/5` | Per-caller rate/burst. |
 | `AVOIDPP_RATE_GLOBAL` | no | `2/10` | Shared rate/burst across all callers. |
 | `AVOIDPP_RATE_UNAUTHENTICATED` | no | `2/10` | Rate/burst for all failed credentials together. |
+| `AVOIDPP_MAX_ACTIVE` | no | `4` | Concurrent inference calls. |
+| `AVOIDPP_MAX_QUEUED` | no | `8` | How many may wait for a slot. |
 | `AVOIDPP_POLICY_MODE` | no | `monitoring` | `monitoring` or `enforcement`. |
 | `AVOIDPP_SCAN_TIMEOUT` | no | `15s` | End-to-end scan budget, max 60s. |
 | `AVOIDPP_SHUTDOWN_TIMEOUT` | no | `10s` | Drain budget on shutdown. |
@@ -120,6 +122,54 @@ the unauthenticated budget for every other unrecognised caller. That is
 acceptable, because legitimate traffic is authenticated and unaffected, and
 the visible consequence is that unrecognised callers receive 429 instead of
 401 — which discloses less, not more.
+
+## Admission control
+
+A rate limit bounds how fast requests *arrive*. It says nothing about how many
+are still running, and that is the number that matters against a dependency
+measured in seconds: at a measured 4.4 seconds per call, a perfectly compliant
+two requests per second leaves roughly nine in flight at steady state — and if
+the provider slows to thirty seconds, sixty. Each one holds a connection, a
+goroutine and a buffer, and nothing in the rate limiter notices.
+
+`AVOIDPP_MAX_ACTIVE` bounds concurrency; `AVOIDPP_MAX_QUEUED` bounds how many
+may wait for a slot. Both are fixed at startup.
+
+The queue is deliberately small. With no queue at all, a momentarily full set
+of slots rejects a request that would have been served milliseconds later,
+which makes the service fragile under ordinary jitter. With an unbounded queue,
+every arrival is accepted and the queue becomes where latency and memory go to
+die — callers wait behind work that will outlive their own deadlines while the
+service reports healthy and serves nobody. A small bounded queue absorbs the
+jitter and refuses the overload.
+
+Excess work receives 503 `overloaded` with retry guidance, immediately. A 503
+now is better information than a response that may arrive in two minutes.
+
+The default of four slots is a little under one completed scan per second,
+which sits just above the global rate limit — so the rate limiter shapes
+traffic in normal operation and admission catches the abnormal case, a provider
+that has slowed down. Note these are sized from measured latency, not from CPU
+count: the work is almost entirely waiting on a network call, so a slot costs a
+goroutine and a connection rather than a core.
+
+### The detector bounds itself too
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `AVOIDPP_DETECTOR_MAX_ACTIVE` | `8` | Concurrent assessments. |
+| `AVOIDPP_DETECTOR_MAX_WAITING` | `16` | How many may wait. |
+
+This is defence in depth, not the primary control, and its reason to exist is
+that the gateway's bound is an assumption about a *different process*. The
+detector is reachable from the internal network, so a debug script or a future
+service could call it directly; and a gateway deployed with two replicas admits
+twice its configured concurrency without either replica knowing.
+
+The detector's bound is set **above** the gateway's on purpose. In normal
+operation the gateway sheds first and this never fires, which means a rejection
+here is a signal that something is talking to the detector directly — worth
+knowing rather than absorbing silently.
 
 ## What is not configurable
 

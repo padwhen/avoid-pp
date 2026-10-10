@@ -492,12 +492,13 @@ func TestUnauthenticatedRequestsAreNotParsed(t *testing.T) {
 		t.Fatalf("NewRegistry: %v", err)
 	}
 	router := NewRouter(readiness, ScanDeps{
-		Detector: counter,
-		Timeout:  time.Second,
-		Log:      slog.New(slog.NewTextHandler(io.Discard, nil)),
-		Mode:     policy.ModeMonitoring,
-		Callers:  registry,
-		Limiter:  permissiveLimits(t, "only"),
+		Detector:  counter,
+		Timeout:   time.Second,
+		Log:       slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Mode:      policy.ModeMonitoring,
+		Callers:   registry,
+		Limiter:   permissiveLimits(t, "only"),
+		Admission: permissiveAdmission(),
 	})
 
 	// A body that would be a 400, plus no credential: the 401 must win.
