@@ -2,8 +2,13 @@ GO ?= go
 GOFMT ?= gofmt
 UV ?= uv
 
+# Local run defaults. 8080 is the gateway's own default, but is often taken by
+# another service (nginx, for one), so the convenience target uses 8099.
+ADDR ?= :8099
+DETECTOR_URL ?= http://localhost:9000
+
 .DEFAULT_GOAL := help
-.PHONY: help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner
+.PHONY: help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner run-gateway
 
 help:
 	@printf '%s\n' \
@@ -14,7 +19,8 @@ help:
 	  'make check-contracts  Validate contract schemas against positive/negative fixtures' \
 	  'make check-contracts-selftest  Prove the contract validator rejects bad data' \
 	  'make check-evals      Validate the Finnish seed dataset and report progress' \
-	  'make check-evals-runner  Assert the evaluation runner against a hand-calculated fixture'
+	  'make check-evals-runner  Assert the evaluation runner against a hand-calculated fixture' \
+	  'make run-gateway   Run the gateway locally (override ADDR= and DETECTOR_URL=)'
 
 bootstrap: bootstrap-go bootstrap-python
 
@@ -51,3 +57,6 @@ check-evals:
 
 check-evals-runner:
 	$(UV) run --project detector --locked --no-sync python evals/selftest.py
+
+run-gateway:
+	cd gateway && AVOIDPP_ADDR=$(ADDR) AVOIDPP_DETECTOR_URL=$(DETECTOR_URL) $(GO) run ./cmd/server
