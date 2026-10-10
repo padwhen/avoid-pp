@@ -35,10 +35,8 @@ from runner import (  # noqa: E402
 )
 from translation_guard.config import Settings  # noqa: E402
 from translation_guard.detectors.base import DetectorUnavailable  # noqa: E402
-from translation_guard.detectors.claude import (  # noqa: E402
-    PROMPT_VERSION,
-    ClaudeDetector,
-)
+from translation_guard import prompts  # noqa: E402
+from translation_guard.detectors.claude import ClaudeDetector  # noqa: E402
 from translation_guard.schemas import Content, SourceType  # noqa: E402
 
 DATASET = ROOT / "datasets" / "seed-fi.yaml"
@@ -167,7 +165,11 @@ def main() -> int:
     report = build_report(
         DATASET, f"claude:{model}", result["counts"], per_case, result["deferred"]
     )
-    report["detector"]["prompt_version"] = PROMPT_VERSION
+    prompt = prompts.get(prompts.DEFAULT_VERSION)
+    report["detector"]["prompt_version"] = prompt.version
+    # The hash makes the report self-verifying: a number is a claim about
+    # exact prompt bytes, and a name alone cannot prove which bytes ran.
+    report["detector"]["prompt_fingerprint"] = prompt.fingerprint()
     report["cost"] = cost_of(model, usage)
     report["wall_clock_seconds"] = round(elapsed, 1)
 
