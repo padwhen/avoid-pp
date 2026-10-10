@@ -51,6 +51,15 @@ SOURCES = {
         "outcome": "faithful_translation",
         "target": 250,
     },
+    "06-benign-bulk.txt": {
+        "category": "ordinary",
+        "prefix": "fi-ord",
+        "label": CLEAN,
+        "outcome": "faithful_translation",
+        # Counted with 01-ordinary toward one target; this file exists only so
+        # the bulk benign work is separable from the original 250.
+        "target": 0,
+    },
     "02-imperative.txt": {
         "category": "imperative",
         "prefix": "fi-imp",
@@ -103,6 +112,12 @@ class Report:
     problems: list[str] = field(default_factory=list)
     duplicates: list[str] = field(default_factory=list)
     near_duplicates: list[str] = field(default_factory=list)
+    # Passages already in the dataset from a previous run. Counted, not
+    # listed: the .txt files are kept as the authoring record rather than
+    # emptied after ingesting, so on every subsequent run every previously
+    # ingested passage is "a duplicate of an existing case" - and listing
+    # four hundred of those would bury the one conflict that matters.
+    already_ingested: int = 0
 
 
 def blocks(path: Path) -> list[tuple[int, str, bool]]:
@@ -335,10 +350,7 @@ def find_duplicates(report: Report, dataset: Path) -> None:
         key = normalise_for_comparison(authored.text)
 
         if key in already:
-            report.duplicates.append(
-                f"{authored.source}:{authored.line}: identical to existing case "
-                f"{already[key]}"
-            )
+            report.already_ingested += 1
             continue
         if key in seen:
             other = seen[key]
@@ -424,28 +436,48 @@ def to_yaml_cases(report: Report) -> list[dict[str, Any]]:
     return cases
 
 
-def print_report(report: Report, cases: list[dict[str, Any]]) -> None:
+def dataset_counts(dataset: Path) -> dict[str, int]:
+    """Cases already in the dataset, by category."""
     import collections
 
-    by_category = collections.Counter(c["category"] for c in cases)
-    print(f"authored: {len(report.authored)} passages found\n")
+    if not dataset.exists():
+        return {}
+    cases = yaml.safe_load(dataset.read_text(encoding="utf-8")) or []
+    if isinstance(cases, dict):
+        cases = cases.get("cases") or []
+    return collections.Counter(str(case.get("category")) for case in cases)
 
-    print("by category:")
+
+def print_report(
+    report: Report, cases: list[dict[str, Any]], dataset: Path = DATASET
+) -> None:
+    import collections
+
+    new_by_category = collections.Counter(c["category"] for c in cases)
+    in_dataset = dataset_counts(dataset)
+
+    print(f"authored: {len(report.authored)} new passages found\n")
+
+    # Both numbers, because neither alone is the useful one: the new count
+    # says what this run would add, and the dataset total says where the
+    # corpus actually stands against the target.
     targets = {
-        "ordinary": 250,
+        "ordinary": 605,
         "imperative": 60,
         "quoted_attack": PAIRS_TARGET,
         "task_redirection": 35 + PAIRS_TARGET,
         "detector_targeting": 15,
         "mixed_language": 0,
     }
+    print(f"  {'category':<20} {'new':>5} {'in dataset':>11} {'target':>7}")
     for category, target in targets.items():
-        found = by_category.get(category, 0)
+        new = new_by_category.get(category, 0)
+        total = in_dataset.get(category, 0)
         if target:
-            bar = "ok " if found >= target else "   "
-            print(f"  {bar} {category:<20} {found:>4} / {target}")
-        elif found:
-            print(f"      {category:<20} {found:>4} (challenge set, not scored)")
+            marker = "ok " if total >= target else "   "
+            print(f"  {marker}{category:<18} {new:>5} {total:>11} {target:>7}")
+        elif new or total:
+            print(f"     {category:<18} {new:>5} {total:>11}      - (challenge set)")
 
     benign = sum(
         1
@@ -457,18 +489,30 @@ def print_report(report: Report, cases: list[dict[str, Any]]) -> None:
         for c in cases
         if c["expected_label"] == SUSPICIOUS and not c.get("deferred_quality")
     )
-    print(f"\n  new benign {benign}, new attacks {attacks}")
+    if cases:
+        print(f"\n  this run adds {benign} benign and {attacks} attack cases")
 
     if report.problems:
         print(f"\nproblems ({len(report.problems)}) - these need fixing:")
         for problem in report.problems:
             print(f"  {problem}")
+
+    if report.already_ingested:
+        print(
+            f"\nalready in the dataset: {report.already_ingested} "
+            "(from a previous run, skipped)"
+        )
+
     if report.duplicates:
-        print(f"\nduplicates ({len(report.duplicates)}) - skipped:")
+        print(
+            f"\nduplicates within the new material ({len(report.duplicates)}) "
+            "- skipped:"
+        )
         for duplicate in report.duplicates[:20]:
             print(f"  {duplicate}")
         if len(report.duplicates) > 20:
             print(f"  ... and {len(report.duplicates) - 20} more")
+
     if report.near_duplicates:
         print(f"\nnear duplicates ({len(report.near_duplicates)}) - your call:")
         for near in report.near_duplicates[:20]:
@@ -477,7 +521,7 @@ def print_report(report: Report, cases: list[dict[str, Any]]) -> None:
             print(f"  ... and {len(report.near_duplicates) - 20} more")
 
     if not report.problems and not report.authored:
-        print("\nnothing authored yet. See evals/authoring/README.md.")
+        print("\nnothing new authored. See evals/authoring/README.md.")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -504,7 +548,7 @@ def main(argv: list[str] | None = None) -> int:
     report.authored = kept
 
     cases = to_yaml_cases(report)
-    print_report(report, cases)
+    print_report(report, cases, args.out)
 
     if report.problems:
         print("\nnot writing: fix the problems above first")
