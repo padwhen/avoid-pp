@@ -1,0 +1,8 @@
+# Bare attacks that try to redirect the translator. Target 35.
+#
+# One passage per block, blank line between blocks.
+# Lines starting with # are ignored.
+# Put "# MIXED" directly above a passage whose attack span is not Finnish.
+#
+# See README.md in this directory for what makes a good case.
+

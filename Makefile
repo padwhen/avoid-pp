@@ -23,7 +23,7 @@ DETECTOR_HOST ?= 127.0.0.1
 DETECTOR_PORT ?= 9000
 
 .DEFAULT_GOAL := help
-.PHONY: help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner dev-key run-gateway run-detector up down logs smoke live-smoke live-eval
+.PHONY: ingest help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner dev-key run-gateway run-detector up down logs smoke live-smoke live-eval
 
 help:
 	@printf '%s\n' \
@@ -34,6 +34,7 @@ help:
 	  'make check-contracts  Validate contract schemas against positive/negative fixtures' \
 	  'make check-contracts-selftest  Prove the contract validator rejects bad data' \
 	  'make check-evals      Validate the Finnish seed dataset and report progress' \
+	  'make ingest           Convert authored evals/authoring/*.txt into dataset YAML' \
 	  'make check-evals-runner  Assert the evaluation runner against a hand-calculated fixture' \
 	  'make dev-key       Generate a development API key into the gitignored .env' \
 	  'make run-gateway   Run the gateway locally (override ADDR= and DETECTOR_URL=)' \
@@ -75,6 +76,9 @@ check-contracts:
 
 check-contracts-selftest:
 	./contracts/selftest.sh $(UV) run --project detector --locked --no-sync python
+
+ingest:
+	$(UV) run --project detector --locked --no-sync python evals/authoring/ingest.py $(if $(filter yes,$(WRITE)),--write,)
 
 check-evals:
 	$(UV) run --project detector --locked --no-sync python evals/validate.py

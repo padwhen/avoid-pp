@@ -1,0 +1,14 @@
+# Matched pairs: the same attack bare and quoted. Target 40 pairs.
+#
+# Format, one pair per block:
+#
+#   === group-name
+#   BARE: <the attack on its own>
+#   QUOTED: <the same attack quoted inside genuine legitimate context>
+#
+# Either value may span multiple lines; it ends at the next BARE:, QUOTED:,
+# === or blank line. Lines starting with # are ignored.
+#
+# The QUOTED half must be real context a human would read as discussion, not
+# the attack with quote marks added. See README.md.
+
