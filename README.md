@@ -468,6 +468,44 @@ the whole passage would pass while leaking both ends of it.
 
 See [C23 acceptance criteria](docs/c23-safe-logging.md).
 
+## Failure behaviour
+
+Twenty-one ways for the detector to misbehave, driven through the real gateway
+and the real client over a real connection: slow, hanging, disconnecting
+early, disconnecting mid-body, malformed, truncated, oversized, mismatched
+request id, unknown enums, HTML instead of JSON, and five upstream status
+codes.
+
+The invariant underneath all of them is that **no failure becomes an allow**. A
+guard that fails open has not failed, it has stopped guarding. Each case
+asserts it twice — the body must parse as an error envelope, which forbids an
+assessment field, and must contain no decision vocabulary at all.
+
+The most dangerous fault is not a status code. It is
+`{"verdict":"no_injection_detected","ok":true,"allow":true}` — a 200 with a
+reassuring body in a shape the contract does not define. Finding
+`no_injection_detected` somewhere is not the same as receiving an assessment.
+
+A deadline is 504; everything else is 503, including every upstream status,
+because a detector 401 is not the caller's authentication problem.
+
+```text
+168 failures across 21 fault modes: goroutines 8 -> 17
+20 oversized replies (3 MiB each): heap delta 210328 bytes
+drained 4 in-flight scans in 1.47ms (budget 3s)
+incomplete drain reported after 302ms: drain within 300ms: deadline exceeded
+soak: 264 requests across 22 modes, statuses map[200:12 503:228 504:24]
+```
+
+Those numbers are the point. A leaked goroutine per failure is invisible at
+small scale and fatal at large, so the only way to see it is to fail 168 times
+and count. Twenty 3 MiB replies would be 60 MB if they were buffered; 210 KB
+is the size limit holding. And a drain that cannot finish reports it rather
+than exiting zero, because otherwise a too-short budget shows up only as
+truncated responses nobody connects to shutdown.
+
+See [C24 acceptance criteria](docs/c24-resilience.md).
+
 ## Running the detector
 
 ```sh
