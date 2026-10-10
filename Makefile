@@ -9,7 +9,7 @@ help:
 	@printf '%s\n' \
 	  'make bootstrap     Resolve Go modules and install locked Python dependencies' \
 	  'make check         Check both language workspaces (run bootstrap first)' \
-	  'make check-go      Check Go formatting, vet and package compilation' \
+	  'make check-go      Check Go formatting, vet, and run tests under -race' \
 	  'make check-python Check Python formatting, lint, types and package import' \
 	  'make check-contracts  Validate contract schemas against positive/negative fixtures' \
 	  'make check-contracts-selftest  Prove the contract validator rejects bad data' \
@@ -32,7 +32,7 @@ check-go:
 	  printf 'Run gofmt on these files:\n%s\n' "$$files"; exit 1; \
 	fi
 	cd gateway && $(GO) vet ./...
-	cd gateway && $(GO) test ./...
+	cd gateway && $(GO) test -race ./...
 
 check-python:
 	cd detector && $(UV) run --locked --no-sync ruff format --check .

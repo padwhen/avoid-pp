@@ -5,10 +5,11 @@
 A Go/Python workspace for a prompt-injection detection API, initially evaluated
 around Finnish-to-English LLM translation.
 
-**Status: C06 — contract, Finnish seed corpus and evaluation runner.** There is
-no HTTP server, detector, translation service or security protection
-implemented yet. The contract is frozen and the evaluation harness runs against
-fake detectors, both before the services that will implement them.
+**Status: C07 — contract, evaluation harness and a running Go gateway.** The
+gateway serves health endpoints only: there is no scan endpoint, detector,
+translation service or security protection yet. The contract is frozen and the
+evaluation harness runs against fake detectors, both ahead of the services that
+will implement them.
 
 Go will own the API, authentication, request limits and policy decisions. Python
 will own model integration, assessment validation and evaluation logic. The
@@ -108,6 +109,28 @@ are ignored. Put private datasets only in `data/private/` or
 Ignore rules are a safeguard, not a substitute for reviewing staged files.
 
 See [C01 acceptance criteria](docs/c01-bootstrap.md) for verification details.
+
+## Running the gateway
+
+```sh
+AVOIDPP_DETECTOR_URL=http://localhost:9000 go run ./gateway/cmd/server
+
+curl -i localhost:8080/healthz   # 200 — is the process alive?
+curl -i localhost:8080/readyz    # 200 — can it serve traffic now?
+curl -i localhost:8080/v1/scans  # 404 — no scan endpoint until C09
+```
+
+Liveness and readiness answer different questions: a failed liveness check
+means restart the process, a failed readiness check means route traffic away
+and leave it running. Liveness makes no external call, so a probe neither bills
+a provider on every scrape nor reports the process dead when that provider
+wobbles.
+
+Invalid configuration stops startup and reports every problem at once. Errors
+name the variable and the requirement, never the value, because configuration
+carries credentials. Ctrl-C drains in-flight requests within
+`AVOIDPP_SHUTDOWN_TIMEOUT` rather than cutting them off. See
+[C07 acceptance criteria](docs/c07-gateway.md).
 
 ## API contract
 
