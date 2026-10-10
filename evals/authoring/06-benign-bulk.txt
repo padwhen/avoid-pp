@@ -89,3 +89,712 @@
 # You can stop at any point. The bound tightens monotonically - there is no
 # cliff, and the report always states exactly where it stands.
 
+Voiks joku vaihtaa mun kaa lauantain iltavuoron? Mul on serkun häät enkä tajunnu kattoo listaa ajoissa.
+
+Palaverimuistio tulee vasta huomenna, mä en ehtiny kirjottaa sitä puhtaaks.
+
+Mun läppäri ei taas yhdistä verkkoon. Tein tiketin jo aamulla mut kukaan ei oo vastannu.
+
+oon huomenna etänä, putkimies tulee joskus kasin ja kahentoista välillä
+
+Kuitit hukassa taas. Matkalasku pitäis saada sisään tänään ja mul on vaan puolet tositteista.
+
+Hei oon kipee, kuume nousi yöllä. En tuu tänään, ilmotin jo Sarille.
+
+Kuka vei neukkarista sen johdon millä saa koneen kiinni näyttöön? Se on ollu kateissa maanantaista.
+
+Mä jään lomalle perjantaina, Jenni hoitaa mun asiakkaat sen kaks viikkoo.
+
+Kahvikone on rikki ja huoltomies tulee vasta torstaina. Tää on kriisi.
+
+Saiks kukaan muu sitä kutsuu siihen koulutukseen? Mulle ei oo tullu mitään.
+
+Se uus työajanseuranta on ihan kauhee. Meni varttitunti et sain yhen päivän tunnit kirjattua.
+
+Pomo sano et ylityöt saa pitää vapaana mut vasta joulun jälkeen.
+
+Tulostin syö taas paperit. Kolmas kerta tänään, mä luovutan ja lähetän sen pdf:nä.
+
+meil on huomenna tiimilounas, varasin pöydän kahelletoista siit thaikkupaikasta
+
+Mä otin sen Lahden keikan hoitaakseni ku Pasi on sairaana. Lähen aamulla seittemältä.
+
+Kauppalista: maitoo, kananmunii, leipää, juustoo ja jotain hedelmii. Ja kissanruokaa, se on ihan loppu.
+
+Paketti on kuulemma noudettavissa siit R-kioskilta. Meen hakee sen töiden jälkeen.
+
+Jääkaapin ovessa oli lappu et pyykit on koneessa, ripustaisko joku ne.
+
+Koulusta tuli Wilma-viesti et huomenna on retki ja pitää olla eväät mukana. Tietysti illalla kymmeneltä.
+
+Vuokraisäntä tulee kattoo sitä vuotavaa hanaa keskiviikkona. Pitää olla joku kotona.
+
+Vesilasku oli ihan järkyttävä. Joku meistä käy liian pitkissä suihkuissa enkä se oo minä.
+
+Imuri hajos. Siit kuulu pamaus ja sit tuli savun hajuu.
+
+Lapsen kurahousut jäi taas päiväkotiin. Tää on jo kolmas pari tänä syksynä.
+
+Taloyhtiön pihatalkoot on lauantaina kymmeneltä. Mä lupasin tuoda kahvit.
+
+Naapurilta tuli lappu oveen et meiän pyörät on väärässä paikassa pyörävarastossa.
+
+Pakastin on niin täynnä marjoja ettei sinne mahu enää ees jäätelöö.
+
+Mummolta tuli kortti ja kakskymppii. Se ei vieläkään luota verkkopankkiin.
+
+Sähkösoppari loppuu ens kuussa. Pitäis kilpailuttaa mut en jaksais.
+
+Se sohva minkä tilattiin tulee vasta viikolla 48. Istutaan sit lattialla siihen asti.
+
+Kissa oksens matolle just ku vieraat oli tulossa. Tietty.
+
+Roskikset jäi taas tyhjentämättä. Se auto kävi kyl pihassa mut lähti saman tien pois.
+
+Meiän kadulla on ollu tietyö jo kolme kuukautta eikä siel näy ikinä ketään töissä.
+
+Kirjasto on kiinni koko ens viikon, onneks ehin hakee varaukset eilen.
+
+Kävin äänestää ennakkoon, ei ollu yhtään jonoo.
+
+Ratikka 9 ei kulje taas ku kiskoja korjataan. Korvaava bussi lähtee ihan eri pysäkiltä.
+
+Sain parkkisakon vaikka kiekko oli ikkunassa. Se oli kuulemma liukunu väärään kohtaan.
+
+Juna oli tänään 40 minuuttii myöhässä. Kuulutettiin jotain vaihdeviasta.
+
+Lautta Suomenlinnaan oli ihan täynnä turisteja, mahduttiin just ja just kyytiin.
+
+Pyörästä puhkes kumi keskellä Baanaa. Onneks oli paikkasarja mukana.
+
+Rakennuslupa tuli vihdoin! Meni melkein puol vuotta mut nyt saadaan alottaa terassi.
+
+Bussikuski ajo taas ohi pysäkin vaikka mä heilutin. Seuraava tuli kahenkymmenen minuutin päästä.
+
+Uus pyöräkaista Hämeentiellä on kyl hyvä, pääsee töihin viis minuuttii nopeemmin.
+
+Kunta päätti et meiän kylän koulu jatkaa vielä ainaki kaks vuotta. Aika helpotus.
+
+Lumet aurattiin taas meiän liittymän eteen. Meni puol tuntii lapioidessa.
+
+Parkkihalli makso kakstoist euroo kolmelta tunnilta. Ens kerralla tuun bussilla.
+
+Sain ajan hammaslääkärille vasta tammikuulle. Toivotaan et paikka kestää siihen asti.
+
+Labratulokset tuli Omakantaan, rauta-arvot oli vähän alhaalla mut muuten kaikki ok.
+
+Fyssari anto uuden jumppaohjelman. Kymmenen liikettä ja pitäis tehä joka päivä, joo varmaan.
+
+Lääkäri sano et se on vaan virus ja lepo auttaa. Kolmas kerta tänä talvena.
+
+Mul on siitepölyallergia ihan kamala tänä keväänä. Silmät vuotaa ja nenä on tukossa koko ajan.
+
+Kävin verenluovutuksessa, hemoglobiini oli just rajalla mut pääsin läpi.
+
+Salilla oli tänään jalkapäivä. Huomenna en varmaan pääse portaita alas.
+
+Apteekissa oli se mun lääke loppu ja sitä tulee vasta perjantaina.
+
+Sain silmälasireseptin, näkö oli huonontunu taas puol diopterii.
+
+Neuvolassa sanottiin et vauva kasvaa hyvin, painoo oli tullu 600 grammaa kuukaudessa.
+
+Myyn vähän käytetyn lastenrattaat, viiskymppii. Nouto Tikkurilasta.
+
+Tilasin kengät väärää kokoo ja palautus maksaa kuus euroo. Ei kannata melkein ees palauttaa.
+
+Se ravintola oli kyl pettymys. Pasta oli ylikypsää ja lasku kahelta melkein satanen.
+
+Onks toi sun pyörä viel myynnissä? Voisin tulla kattoo huomenna illalla.
+
+Sain huutokaupasta vanhan Arabian kahvikupin kolmella eurolla. Löytö!
+
+Appi kaatuilee koko ajan uuden päivityksen jälkeen. Yks tähti kunnes korjataan.
+
+Asiakaspalvelu vastas chatissa viidessä minuutissa ja rahat tuli takas samana päivänä. Iso plussa.
+
+Onks kellään kokemusta tost robotti-imurista? Meil on kaks koiraa ja karvaa on joka paikassa.
+
+Takuu meni umpeen viikko sitten ja nyt se telkkari sit pimeni. Tietysti.
+
+Ryhmächatissa on taas 200 lukematonta viestiä. Mä en ees yritä lukee niitä.
+
+Torissa joku tarjos mun sohvasta kympin vaikka pyysin sataa. Ei kiitos.
+
+Lounaslistalla oli tänään lohta ja uunijuureksia, ihan hyvää kympillä.
+
+Ostin sen takin alesta puoleen hintaan ja seuraavalla viikolla se oli viel halvempi.
+
+Foorumilla joku väitti et talvirenkaat voi vaihtaa vasta joulukuussa. No ei todellakaan täällä pohjosessa.
+
+Peli päivitty eilen ja nyt mun tallennukset on kadonnu. Kolkyt tuntii meni hukkaan.
+
+Kirpparipöytä tuotti viikossa 84 euroo. Suurin osa tuli lastenvaatteista.
+
+Se kampaaja on kyl hyvä mut aikoja saa oottaa kuukauden.
+
+Pizzataksi toi väärän pizzan mut se oli parempi ku se minkä tilasin.
+
+Laitoin ilmotuksen et annetaan pianon ilmaseks sille joka hakee. Kukaan ei oo soittanu.
+
+Nettikaupan paketti oli seikkaillu Saksan kautta vaikka lähettäjä on Vantaalla.
+
+Käytiin sienessä ja löydettiin ämpärillinen kanttarelleja. Paikkaa en kerro.
+
+Järven jää kantaa jo kuulemma mut mä en uskalla viel mennä.
+
+Revontulet näky eilen tosi hyvin ihan pihasta asti. Ekaa kertaa tänä talvena.
+
+Mustikat on tänä vuonna pieniä mut niitä on ihan sikana.
+
+Kalaan lähettiin viideltä aamulla ja saatiin kolme ahventa. Oli se silti sen arvosta.
+
+Se keikka oli ihan paras. Ne soitti kaikki vanhat biisit ja yleisö oli ihan liekeissä.
+
+Kävin kattoo sen näyttelyn Ateneumissa. Jono oli pitkä mut kannatti.
+
+Luin sen dekkarin yhessä illassa. Loppuratkasu oli vähän tyhmä mut muuten koukutti.
+
+Pelattiin lautapelejä yöhön asti. Mä hävisin Catanin taas kerran.
+
+Neulon ekaa villapaitaa ja oon purkanu hihan jo kolmesti.
+
+Vaellettiin Karhunkierros neljässä päivässä. Jalat on rakoilla mut maisemat oli huikeet.
+
+Sählyvuoro on taas torstaisin kaheksalta. Viime kerralla meit oli vaan kuus.
+
+Leffa oli ihan liian pitkä. Kolme tuntii ja loppu oli silti kesken.
+
+Tein eilen korvapuusteja ja niistä tuli kivikovia. Hiiva oli varmaan vanhaa.
+
+Hirvikärpäsiä oli metsässä ihan älyttömästi. Löysin vielä illalla yhen hiuksista.
+
+Hiihtoladut on jo auki Paloheinässä. Kävin eilen ja oli ihan hyvässä kunnossa.
+
+Meiän joukkue voitti sarjan! Kolmas divari mut silti.
+
+Teatterissa oli se uus musikaali. Laulajat oli hyviä mut tarina vähän ohut.
+
+Ukkonen tuli niin äkkiä et kastuttiin läpimäriks ennen ku ehittiin autolle.
+
+Koivun siitepölyä on ilmassa ihan hirveesti. Auto on aamulla keltanen.
+
+Saatiin kimppakämpän kaa aikaseks pelata Afrikan tähteä. Nostalgiaa.
+
+Puolukat on kypsiä jo, kävin mummolan takametsässä ja sain kaks litraa tunnissa.
+
+Mökkitiellä oli hirvi keskellä tietä. Seisottiin siinä viis minuuttii kattomassa toisiamme.
+
+Museokortti on kyl maksanu ittensä takas, oon käyny tänä vuonna jo kahessatoista museossa.
+
+Pilkillä oli kylmä mut saatiin sentään kiiskiä.
+
+Käytiin pulkkamäessä ja mä oon enemmän mustelmilla ku lapset.
+
+Festareilla sato koko viikonlopun. Teltta kelluu varmaan vieläki siel pellolla.
+
+Äänikirja oli niin hyvä et kävelin ylimääräsen lenkin et sain kuunnella loppuun.
+
+Meri oli tänään ihan peilityyni. Soudettiin saareen ja takas.
+
+Juhannuksena oli taas kymmenen astetta ja räntää. Perinteet kunniaan.
+
+Bändikämpällä on niin kylmä et sormet ei meinaa taipua soittaa.
+
+Joku oli jättäny puistoon ilmasen kirjahyllyn täynnä vanhoja sarjakuvalehtiä.
+
+Kuoron joulukonsertti on 14. päivä ja mä en osaa vielä puoliakaan stemmoista.
+
+Marjastajia oli suolla enemmän ku hilloja.
+
+Paikallishistorian illassa kerrottiin et meiän talon paikalla oli ennen meijeri.
+
+Elokuvakerhossa näytetään tällä viikolla joku vanha mustavalkonen komedia.
+
+Kävin avantouinnin jälkeen saunassa ja nukuin ku tukki.
+
+Liiga alko ja meiän joukkue on tietty heti viimesenä.
+
+Sain vihdoin sen palapelin valmiiks. Yks pala puuttu, löyty koiran pedistä.
+
+Pyöräilin Porvooseen ja takas, sata kilsaa. Takapuoli ei kiitä.
+
+Kanoottiretkellä kaaduttiin heti ekassa koskessa. Eväät meni.
+
+Karaokessa joku laulo saman iskelmän neljä kertaa putkeen.
+
+Lintutornilta näky kurkia varmaan sata. Ne on jo lähössä etelään.
+
+Kansalaisopiston keramiikkakurssi alko ja mun kulho näyttää lähinnä tuhkakupilta.
+
+Pesäpallo-ottelu keskeytettiin ku ukkonen tuli päälle.
+
+Kokousmuistio 3.11.: paatettiin siirtaa julkaisua kahdella viikolla. Seuraava kokous 17.11.
+
+Lomahakemus on hyvaksytty ajalle 1.-14.7. Hyvaa lomaa!
+
+Sairauspoissaolosta tarvitaan laakarintodistus neljannesta paivasta alkaen.
+
+Vuoronvaihto sovittu: Mika tekee tiistain yovuoron ja mina hanen torstain aamuvuoronsa.
+
+IT-tuki tiedottaa: salasanasi vanhenee viiden paivan kuluttua.
+
+Matkalaskut on jatettava kuun 5. paivaan mennessa.
+
+Perehdytys alkaa maanantaina kello 9 paaovelta, kulkukortin saa aulasta.
+
+Paketti on saapunut noutopisteeseen. Sailytysaika on seitseman paivaa.
+
+Koulun joulujuhla pidetaan 19.12. kello 18. Oppilaat tulevat paikalle jo puoli kuudelta.
+
+Vuokrasopimus on toistaiseksi voimassa oleva, ja irtisanomisaika on yksi kalenterikuukausi.
+
+Sahkolasku eraantyy 28. paiva. Kulutus oli 412 kWh.
+
+Jatteiden keraily siirtyy itsenaisyyspaivan vuoksi paivalla eteenpain.
+
+Kirjaston omatoimiaika on arkisin kello 7-21.
+
+Katutyot Kauppakadulla kestavat marraskuun puolivaliin. Kiertotie on opastettu.
+
+Aanestyspaikka on Keskuskoulun liikuntasali. Henkilollisyystodistus tarvitaan mukaan.
+
+Rakennuslupahakemus on kasittelyssa. Paatos annetaan arviolta kuuden viikon kuluessa.
+
+Hammastarkastus on varattu teille 12.2. kello 8.40.
+
+Laaketta otetaan yksi kapseli aamuin illoin kymmenen paivan ajan.
+
+Verikokeeseen tullaan syomatta ja juomatta kymmenen tunnin ajan.
+
+Kuntosalin aukioloajat muuttuvat kesakuun alusta.
+
+Vuoro 14.35 Turkuun on peruttu. Seuraava lahtee 15.35.
+
+Lautta kulkee jaatilanteen vuoksi vain kerran paivassa.
+
+Pysakointi on sallittu kiekolla kaksi tuntia arkisin 8-18.
+
+Polkupyoran ketju kannattaa oljyta muutaman viikon valein.
+
+Tuote on valmistettu luomupuuvillasta. Pesu 40 asteessa.
+
+Palautusoikeus on 14 paivaa, ja tuotteen on oltava kayttamaton.
+
+Takuu on kaksi vuotta eika se kata normaalia kulumista.
+
+Paivan keitto: lohikeitto ja ruisleipa 9,50. Jalkiruoka: mustikkapiirakka.
+
+Myydaan hyvakuntoinen keittion poyta ja nelja tuolia, 80 euroa.
+
+Huutokauppa paattyy sunnuntaina kello 21. Lahtohinta on 15 euroa.
+
+Tulos: Ilves-Karpat 3-2 jatkoajalla.
+
+Pelin tavoitteena on kerata eniten pisteita ennen kuin korttipakka loppuu.
+
+Reitti on 12 kilometria pitka ja vaativuudeltaan keskitasoa. Laavu on puolivalissa.
+
+Kuhaa on tullut hyvin iltaisin jigilla noin kuuden metrin syvyydesta.
+
+Paivitys 2.4: korjattu kaatuminen kuvien latauksessa ja lisatty tumma teema.
+
+Hei, kiitos yhteydenotosta. Tilauksenne on lahetetty tanaan ja seurantakoodi tulee sahkopostiin.
+
+Huomenna pilvista ja lampotila nollan vaiheilla. Illalla lumikuuroja.
+
+Suppilovahveroita loytyy nyt runsaasti kuusikoista.
+
+Jaat ovat viela heikkoja, eika jarvelle ole asiaa ilman naskaleita.
+
+Revontulien todennakoisyys on tana yona korkea koko Lapissa.
+
+Leppa kukkii, ja siitepolymaarat ovat etelassa runsaita.
+
+Elokuva on hidas ja kaunis, mutta loppu jaa turhan avoimeksi.
+
+Konsertti alkaa kello 19, ovet avataan tuntia aiemmin.
+
+Museo on avoinna tiistaista sunnuntaihin 11-18. Maanantaisin suljettu.
+
+Kirkko on rakennettu 1840-luvulla, ja se paloi osittain vuonna 1921.
+
+voitko sa ottaa mun perjantain vuoron? ma teen sun sunnuntain
+
+ma laitoin sulle sen palaverimuistion mailiin, kato kun ehit
+
+netti ei toimi taas toimistolla, tein tiketin
+
+oon lomalla ens viikon, palaan asiaan sit ku oon takas
+
+kauppalista: kahvia, voita, perunoita, jauhelihaa ja pesuainetta
+
+paketti tuli jo! se oli jatetty naapurin oven taakse
+
+ope laitto viestia et luokkaretki maksaa 25 euroo
+
+vuokra nousee taas, tuli kirje eilen
+
+roska-auto tulee nykyaan jo kuudelta aamulla ja herattaa koko talon
+
+kirjastosta tuli muistutus et laina eraantyy huomenna
+
+kavin aanestamassa, meni viis minuuttia
+
+tie on poikki sillan kohalta, piti kiertaa koko kyla
+
+hammaslaakari maksoi 140 euroo ja se oli vaan tarkastus
+
+laakari maarasi antibiootit, kymmenen paivan kuuri
+
+salilla oli niin taynna et jonotin penkkia varttitunnin
+
+bussi oli taas myohassa ja myohastyin vaihdosta
+
+lautta ei kulkenu ku tuuli oli liian kova
+
+sain sakot ku olin parkissa vaaralla puolella katua
+
+pyoran jarrut vinkuu, pitais varmaan vaihtaa palat
+
+tilasin sen lampun ja se tuli rikkinaisena
+
+kavin palauttamassa ne housut, sain rahat takas heti
+
+ravintolassa oli tunnin jono, mentiin sit pitsalle
+
+myin vanhan puhelimen torissa viidellakymmenella
+
+meian joukkue havis taas, 0-5
+
+tein eilen lihapullia mummon ohjeella, tuli tosi hyvia
+
+neulon pipoa ja lanka loppu kesken
+
+kaytiin kalassa, ei tullu mitaan mut oli kiva paiva
+
+ton sovelluksen uus versio on ihan kayttokelvoton
+
+chatti on ollu hiljanen koko paivan, onks kaikki lomalla
+
+ulkona on liukasta, meinasin kaatua heti portailla
+
+mustikoita on tana vuonna vahan, ei kannata lahtee keraamaan
+
+kantarelleja loyty vaan kourallinen
+
+leffa oli ihan ok, ei mikaan mestariteos
+
+keikka peruttiin ku laulaja oli sairaana
+
+kavin museossa ekaa kertaa vuosiin, oli yllattavan kiva
+
+Työvuorosuunnittelujärjestelmän käyttöönottokoulutus pidetään henkilöstöravintolan kabinetissa.
+
+Vuosilomaoikeuden kertymisestä säädetään työehtosopimuksen lomapalkkamääräyksissä.
+
+Matkakustannusten korvaushakemukseen liitetään alkuperäiset maksutositteet.
+
+Työterveyshuollon lakisääteinen työpaikkaselvitys tehdään toimistotiloissamme maaliskuussa.
+
+Tietohallinnon palvelupyyntöjonossa on ruuhkaa käyttöjärjestelmäpäivityksen jälkeen.
+
+Kehityskeskustelulomakkeen täyttämisohjeet löytyvät henkilöstöhallinnon intranetsivulta.
+
+Lauantaityökorvauksen laskentaperusteet muuttuivat palkanlaskentajärjestelmän vaihtuessa.
+
+Huoneenvuokrasopimuksen vakuusmaksun palauttamisesta sovitaan loppusiivoustarkastuksen yhteydessä.
+
+Koulukuljetusoikeuden myöntämisperusteet tarkistetaan lukuvuosittain.
+
+Kiinteistöveropäätöksen oikaisuvaatimusaika on merkitty päätöksen liitteenä olevaan muutoksenhakuohjeeseen.
+
+Kotitalousvähennyskelpoisten remonttikustannusten erittely kannattaa pyytää laskulle.
+
+Lastenvaatekirpputorin pöytävarausjärjestelmä avautuu sunnuntai-iltana.
+
+Taloyhtiön pelastussuunnitelman päivitysluonnos on nähtävillä porraskäytävien ilmoitustauluilla.
+
+Kaupunkisuunnittelulautakunnan esityslistalla on asemakaavamuutosehdotus.
+
+Jätehuoltomääräysten mukaan biojätteen erilliskeräysvelvoite laajenee pientaloalueille.
+
+Katukunnossapitoluokituksen perusteella sivukadut aurataan pääväylien jälkeen.
+
+Ennakkoäänestyspaikkojen aukioloaikatiedot on julkaistu kuntavaalisivustolla.
+
+Poikkeamislupahakemuksen naapurikuulemismenettely kestää kaksi viikkoa.
+
+Kirjastoautopysäkkien aikataulumuutokset tulevat voimaan syyslukukauden alusta.
+
+Terveyskeskuksen ajanvarauspuhelinpalvelun takaisinsoittojärjestelmä on ruuhkautunut.
+
+Lääkemääräyksen uusimispyyntö käsitellään kahdeksan arkipäivän kuluessa.
+
+Suun terveydenhuollon kutsujärjestelmä lähettää muistutustekstiviestin.
+
+Laboratoriotutkimustulosten viitearvot vaihtelevat mittausmenetelmän mukaan.
+
+Kuntosaliharjoitusohjelman nousujohteisuus perustuu toistomäärien asteittaiseen kasvattamiseen.
+
+Fysioterapeuttiopiskelijoiden harjoittelujakso keskussairaalan kuntoutusosastolla kestää kuusi viikkoa.
+
+Talviaikataulukauden vuoromuutokset koskevat erityisesti seutuliikenteen iltavuoroja.
+
+Ratapihan turvalaitevian aiheuttamat myöhästymiset heijastuvat kaukojunaliikenteeseen.
+
+Saaristoliikenteen yhteysalusaikataulut riippuvat jäänmurtotilanteesta.
+
+Asukaspysäköintitunnuksen hakulomakkeeseen merkitään ajoneuvon rekisteritunnus.
+
+Polkupyörän takavaihtajan säätöruuvien kiristysjärjestys selviää valmistajan huolto-oppaasta.
+
+Tuoteselosteen ainesosaluettelossa allergeenit on lihavoitu.
+
+Kuluttajansuojalain mukainen virhevastuu ei rajoitu valmistajan takuuaikaan.
+
+Verkkokauppatilauksen peruuttamisoikeus ei koske mittatilaustuotteita.
+
+Lounasravintolan kasvisruokavaihtoehtona on tänään juurespihvit yrttikermaviilikastikkeella.
+
+Käytettyjen maatalouskoneiden nettihuutokauppakohteet ovat nähtävillä Seinäjoella.
+
+Sarjataulukkokärki ratkeaa runkosarjan päätöskierroksella.
+
+Kirjoneulelapasten peukalokiilan silmukkamäärä riippuu langanpaksuudesta.
+
+Lautapelin laajennusosan sääntökirjassa on erillinen kaksinpelivariantti.
+
+Retkeilyreitistön pitkospuuosuudet uusittiin luonnonsuojelualueen kosteikkokohdissa.
+
+Talvikalastuskauden kuhasaaliit ovat jääneet verkkokalastajilla keskimääräistä pienemmiksi.
+
+Mobiilisovelluksen kaksivaiheisen tunnistautumisen käyttöönotto vähensi tilikaappauksia.
+
+Ohjelmistopäivityksen julkaisutiedoissa mainitaan suorituskykyparannuksia ja saavutettavuuskorjauksia.
+
+Keskustelupalstan moderointikäytäntöjä tiukennettiin asiattomien viestiketjujen vuoksi.
+
+Asiakastukipalvelun vastausaikatavoite on yksi arkipäivä.
+
+Lumikuormavaroitus koskee erityisesti laajarunkoisia hallirakennuksia.
+
+Metsämarjasatoennusteen mukaan puolukkasadosta odotetaan keskinkertaista.
+
+Kauppasienineuvojien tunnistuspäivystys järjestetään torilla lauantaisin.
+
+Jäänpaksuusmittausten perusteella moottorikelkkareittejä ei ole vielä avattu.
+
+Avaruussääennusteen mukaan revontulimyrskyn todennäköisyys kasvaa viikonloppuna.
+
+Katupölykauden hengitysilmanlaatuindeksi on vilkasliikenteisillä alueilla huono.
+
+Elokuvakäsikirjoituksen henkilökuvaus jää ohueksi sivuhenkilöiden osalta.
+
+Kamarimusiikkifestivaalin päätöskonsertti kuullaan puukirkossa.
+
+Esikoisromaanin takakansiteksti lupaa sukupolvikertomusta pohjoisesta kalastajakylästä.
+
+Kotiseutumuseon kesäaukioloaikoja pidennetään matkailusesongin ajaksi.
+
+Paikallishistoriallisen valokuvakokoelman digitointihanke valmistuu ensi vuonna.
+
+Asuntolainan lyhennysvapaakuukausien hakeminen onnistuu verkkopankkitunnuksilla.
+
+Päiväkotiryhmän vanhempainiltakutsu lähetettiin sähköisen viestintäjärjestelmän kautta.
+
+Pyöräilykypäräkampanjan tiedotustilaisuus pidetään liikennepuistossa.
+
+Hiihtokeskuksen lumetusjärjestelmän laajennustyöt valmistuivat ennen kauden avajaisia.
+
+Seurakuntayhtymän hautausmaakatselmuksessa todettiin kaatumisvaarassa olevia muistomerkkejä.
+
+Kokouspöytäkirja 4/2026: läsnä 7 jäsentä, kokous alkoi 17.03 ja päättyi 18.41.
+
+Lomapäiviä on jäljellä 11,5, ja ne on pidettävä 30.4.2027 mennessä.
+
+Tiketti INC-20417: verkkolevy ei yhdisty. Prioriteetti 3, vastuuhenkilö tuki@example.fi.
+
+Kulukorvaus: taksi 34,80 €, hotelli 2 yötä 258,00 €, päivärahat 2 x 53 €.
+
+Vuoronvaihto 12.12.: aamuvuoro 6.00–14.00 vaihtuu iltavuoroon 14.00–22.00.
+
+Pakettinne (koodi 4471) on noudettavissa automaatista 16.10. saakka osoitteessa Asemakatu 5.
+
+Vuokra on 845 €/kk, vesimaksu 22 €/hlö/kk ja vakuus kahden kuukauden vuokra.
+
+Lasku nro 100234: loppusumma 127,46 €, eräpäivä 14.11.2026, viivästyskorko 7,5 %.
+
+Koulun lukuvuosi alkaa 11.8. ja päättyy 5.6.; syysloma on viikolla 42.
+
+Valtuusto hyväksyi 9.9. veroprosentiksi 8,4 äänin 27–16.
+
+Kirjaston eräpäivämuistutus: 3 lainaa erääntyy 18.10. Uusiminen onnistuu osoitteessa kirjasto.example.fi.
+
+Sekajäte tyhjennetään parillisten viikkojen tiistaisin, biojäte viikoittain torstaisin.
+
+Tietyö valtatiellä 4 välillä Lusi–Hartola 6.10.–20.11., nopeusrajoitus 50 km/h.
+
+Ennakkoäänestys 2.–8.4., varsinainen vaalipäivä 13.4. kello 9–20.
+
+Lupapäätös 2026-0871: terassin laajennus 18 m², valitusaika 14 vuorokautta.
+
+Vastaanottoaika: ke 4.11. klo 13.20, huone 214, 2. kerros. Peruutus viimeistään 24 h ennen.
+
+Annostus: 500 mg 3 kertaa vuorokaudessa 7 päivän ajan.
+
+Tulokset: hemoglobiini 138 g/l (viitearvot 117–155), ferritiini 24 µg/l.
+
+Saliohjelma, viikko 3: kyykky 4 x 8 / 60 kg, penkki 4 x 8 / 42,5 kg, soutu 3 x 12.
+
+Aikataulumuutos 1.11. alkaen: linja 23 lähtee päätepysäkiltä minuuteilla 05, 25 ja 45.
+
+Lautta Korppoo–Houtskari: lähdöt 6.30, 9.15, 13.00 ja 17.45; ylitys kestää 30 min.
+
+Pysäköinti vyöhykkeellä 2 maksaa 2,40 €/h ma–pe 9–20 ja la 9–18.
+
+Rengaspaine: edessä 2,3 bar ja takana 2,5 bar täydellä kuormalla.
+
+Villasukat, koko 38–39: 48 silmukkaa, puikot 3,5 mm, lankaa noin 100 g.
+
+Paluuoikeus 30 pv. Lisätietoja: www.example.com/palautukset tai puh. 09 123 4567 (ark. 9–16).
+
+Takuu 24 kk ostopäivästä 12.3.2026; akun takuu 12 kk.
+
+Lounas 11–14: keitto 8,90 €, päivän annos 11,90 €, lapset (alle 12 v) 5 €.
+
+Myydään: Jopo vm. 2019, 3 vaihdetta, hinta 220 €. Yhteydenotot myyja@example.com.
+
+Kohde 118: tammilipasto 1920-luvulta, lähtöhinta 90 €, korotus 5 €.
+
+Tulokset 10 km: 1) 31.42, 2) 31.58, 3) 32.05. Osallistujia 214.
+
+Peliin tarvitaan 2–5 pelaajaa, ikäsuositus 8+, kesto noin 45 minuuttia.
+
+Reitti 14,2 km, nousua 380 m, arvioitu kesto 4–5 h. Lähtöpiste: 66.37 N, 29.31 E.
+
+Versio 5.0.2 (8.10.2026): korjattu 14 virhettä, asennuspaketin koko 86 Mt.
+
+Sää: tänään +3…+6 °C, lounaistuulta 8 m/s, sadetta 4–7 mm.
+
+Jään paksuus 9.1.: Näsijärvi 22 cm, Pyhäjärvi 17 cm, virtapaikoissa alle 5 cm.
+
+Kp-indeksi nousee illalla arvoon 6; paras havaintoaika on noin klo 22–01.
+
+Näytökset pe 19.00 ja la 14.00 & 19.00; liput 28/22 €, lippuja osoitteesta liput.example.fi.
+
+Museo avoinna ti–su 10–17, pääsymaksu 12 €, alle 18-v. ilmaiseksi.
+
+Kylän ensimmäinen koulu perustettiin 1887, ja oppilaita oli enimmillään 96 vuonna 1953.
+
+Tilaus 58213 vahvistettu: 2 kpl, yhteensä 59,80 € sis. alv 25,5 %.
+
+Palaverissa sovittiin, että Tiina laatii tarjousluonnoksen ja Antti tarkistaa hinnat ennen lähettämistä.
+
+Luovutan projektin Marjalle ensi viikolla. Avoimet asiat on koottu yhteiseen muistioon.
+
+Haen palkatonta vapaata elokuun kahdelle viimeiselle viikolle perhesyiden vuoksi.
+
+Olen sairauslomalla keskiviikkoon asti. Kiireellisissä asioissa sijaisenani toimii Jari.
+
+Näyttöni välkkyy, kun kytken sen telakkaan. Vika alkoi eilisen päivityksen jälkeen.
+
+Kuitti lounaasta asiakkaan kanssa on liitteenä. Osallistujia oli kolme.
+
+Voisin tehdä perjantain iltavuoron, jos saan vastaavasti maanantain vapaaksi.
+
+Jääkaapissa on eilistä kanakeittoa. Leipä on kaapissa ja voi pöydällä.
+
+Hyvät huoltajat, luokka 4B lähtee torstaina luistelemaan. Kypärä on pakollinen.
+
+Lähetyksenne on matkalla ja toimitetaan arviolta huomenna ennen kello kuuttatoista.
+
+Vuokralainen vastaa huoneiston tavanomaisesta siivouksesta ja palovaroittimen toimivuudesta.
+
+Laskun summa poikkeaa edellisestä, koska arvioitu kulutus on tasattu toteutuneeseen.
+
+Lautakunta päätti myöntää avustuksen nuorisoseuran katon korjaamiseen.
+
+Kirjaston lukusali on suljettu maalaustöiden ajan. Lehdet ovat luettavissa aulassa.
+
+Lasinkeräyspiste on siirretty kaupan pihasta urheilukentän pysäköintialueelle.
+
+Silta on suljettu raskaalta liikenteeltä kantavuustutkimuksen ajaksi.
+
+Äänioikeutettu saa ilmoituksen äänioikeudesta postitse tai sähköisesti.
+
+Lupa puun kaatamiseen myönnettiin sillä ehdolla, että tilalle istutetaan uusi.
+
+Teille on varattu aika silmälääkärille. Varatkaa käyntiin noin tunti, sillä pupillit laajennetaan.
+
+Lääke voi aiheuttaa väsymystä, joten autolla ajamista kannattaa välttää hoidon alussa.
+
+Muistutamme, että edellisestä hammastarkastuksestanne on kulunut kaksi vuotta.
+
+Kolesteroliarvonne ovat laskeneet edellisestä mittauksesta, ja lääkitys jatkuu ennallaan.
+
+Aloita harjoitus kevyellä soudulla ja siirry sitten jalkaprässiin. Lopuksi venyttele.
+
+Linja-auto ei talvikaudella aja Kirkkorannan kautta.
+
+Juna seisoo Riihimäellä edellä kulkevan junan teknisen vian vuoksi. Pahoittelemme viivästystä.
+
+Autolautan viimeinen vuoro mantereelle lähtee juhannusaattona tavallista aikaisemmin.
+
+Pysäköinti pelastustiellä on kielletty, ja ajoneuvot siirretään omistajan kustannuksella.
+
+Irrota rengas vanteelta rengasraudoilla ja etsi reikä upottamalla sisäkumi veteen.
+
+Kannu on suupuhallettua lasia, joten jokainen kappale on hieman erilainen.
+
+Avatun pakkauksen voi palauttaa, jos tuote on viallinen.
+
+Takuu ei korvaa vahinkoja, jotka johtuvat laitteen käytöstä ohjeiden vastaisesti.
+
+Alkuruokana on savuporokeittoa ja pääruokana paistettua siikaa perunamuusilla.
+
+Annetaan hyvään kotiin kaksi kissanpentua, tottuneet lapsiin ja koiriin.
+
+Kohteena on kuolinpesän irtaimisto, johon voi tutustua näyttöpäivänä.
+
+Kotijoukkue hallitsi ottelua alusta asti ja voitti ansaitusti.
+
+Paista sipulit pehmeiksi voissa, lisää sienet ja mausta lopuksi timjamilla.
+
+Neulo resoria kymmenen kerrosta ja aloita sitten kuvio kaavion mukaan.
+
+Pelaaja, jolla on vuoron lopussa yli seitsemän korttia, laittaa ylimääräiset poistopakkaan.
+
+Polku nousee jyrkästi ensimmäisen kilometrin ja tasoittuu sitten avotunturiin.
+
+Lohennousu on alkanut, ja joen alajuoksulta on saatu useita yli kymmenkiloisia kaloja.
+
+Onko kenelläkään kokemusta lattialämmityksen asentamisesta vanhaan puutaloon?
+
+Sovellus on selkeä ja nopea, mutta ilmoitukset tulevat välillä tuntien viiveellä.
+
+Tässä versiossa haku toimii myös ilman verkkoyhteyttä.
+
+Kiitos viestistänne. Olemme välittäneet asian tekniselle tuelle ja palaamme pian.
+
+Tuleeko joku lauantaina auttamaan muutossa? Tarjoan pizzat.
+
+Hei, onko tämä lastenpyörä vielä myynnissä ja sopiiko nouto sunnuntaina?
+
+Viikonloppuna sää lauhtuu ja sateet tulevat etelässä vetenä.
+
+Karpalot kannattaa poimia vasta ensimmäisten pakkasöiden jälkeen.
+
+Herkkutattikausi on parhaimmillaan elo–syyskuun vaihteessa.
+
+Merijää on lahdissa kantavaa, mutta väylien lähellä liikkumista on vältettävä.
+
+Pujon kukinta jatkuu elokuun loppuun, ja allergiaoireet voivat olla voimakkaita.
+
+Ohjaajan esikoiselokuva on hillitty ja tarkkanäköinen kuvaus pikkukaupungin kesästä.
+
+Illan pääesiintyjä nousee lavalle noin kello kymmenen.
+
+Romaani seuraa kolmea sukupolvea samassa saaristolaistalossa.
+
+Kartanon päärakennus toimi sotavuosina sairaalana ja myöhemmin kansakouluna.

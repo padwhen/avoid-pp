@@ -27,9 +27,10 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT.parent / "detector" / "src"))
 
+import holdout  # noqa: E402
+import splits  # noqa: E402
 from runner import (  # noqa: E402
     build_report,
-    load_cases,
     print_summary,
     score,
 )
@@ -45,6 +46,12 @@ REPORTS = ROOT / "reports"
 
 # Dated list price per million tokens, recorded so a saved report can be
 # re-costed later rather than silently assuming today's rates.
+# Measured from the C13 full-corpus run: 73 requests, 85,223 input and 14,090
+# output tokens, $0.7784 at the prices below. Finnish passages vary, so this
+# is an average rather than a bound - but it is an average of real calls.
+MEASURED_USD_PER_CASE = 0.7784 / 73
+MEASURED_SOURCE = "C13 run: 73 cases, $0.7784"
+
 PRICING = {
     "claude-opus-5": {"input": 5.00, "output": 25.00, "as_of": "2026-06-24"},
     "claude-sonnet-5": {"input": 2.00, "output": 10.00, "as_of": "2026-06-24"},
@@ -135,20 +142,80 @@ def main() -> int:
     parser.add_argument("--model", default=None)
     parser.add_argument("--limit", type=int, default=0, help="first N cases only")
     parser.add_argument("--concurrency", type=int, default=5)
+    parser.add_argument(
+        "--splits",
+        default=",".join(holdout.DEFAULT_SPLITS),
+        help="comma-separated splits to evaluate (default: development,validation)",
+    )
+    parser.add_argument(
+        "--confirm-holdout",
+        action="store_true",
+        help="required to evaluate the holdout; the access is logged",
+    )
     args = parser.parse_args()
 
     settings = Settings()
     model = args.model or settings.model
-    cases = load_cases(DATASET)
+    # Splits, not the whole dataset. Until C26 this ran every case including
+    # the holdout, which would have spent the holdout's one-time value on a
+    # routine iteration - and silently, since nothing in the output said which
+    # cases had been used.
+    requested = tuple(part.strip() for part in args.splits.split(",") if part.strip())
+    try:
+        cases = splits.cases_for(requested, DATASET)
+    except KeyError as exc:
+        print(f"live-eval: {exc}", file=sys.stderr)
+        return 1
+
+    if "holdout" in requested:
+        # Not blocked, because a holdout that can never be used is not a
+        # holdout, it is dead weight. Recorded instead, with the prompt
+        # fingerprint, so a holdout result can be shown to predate the
+        # prompt change rather than to have informed it.
+        prompt_now = prompts.get(prompts.DEFAULT_VERSION)
+        if holdout.prompt_changed_since_last_access(prompt_now.fingerprint()):
+            print(
+                "live-eval: WARNING - the prompt has changed since the holdout "
+                "was last read.\n"
+                "           Repeated holdout runs across prompt changes are how "
+                "a holdout stops\n"
+                "           being one. This access is being logged."
+            )
+        if not args.confirm_holdout:
+            print(
+                "live-eval: refusing to read the holdout without "
+                "--confirm-holdout.\n"
+                "           The holdout exists to be read once, against a "
+                "frozen prompt.",
+                file=sys.stderr,
+            )
+            return 1
+
     if args.limit:
         cases = cases[: args.limit]
 
     if not args.confirm:
         price = PRICING.get(model, {})
-        rough = len(cases) * 0.04 if model == "claude-opus-5" else len(cases) * 0.01
+        # Measured, not guessed. The previous estimate used a flat $0.04 per
+        # case for Opus and was four times the real figure - an estimate that
+        # wrong either scares someone off a cheap run or surprises them on an
+        # expensive one.
         print(__doc__)
-        print(f"Would call {model} once per case: {len(cases)} requests.")
-        print(f"Rough estimate: ${rough:.2f} (list price {price or 'unknown'}).")
+        print(f"Would call {model} once per case: {len(cases)} requests")
+        print(f"  splits: {', '.join(requested)}")
+        if price:
+            estimate = len(cases) * MEASURED_USD_PER_CASE
+            print(
+                f"  estimate: ${estimate:.2f} at the measured "
+                f"${MEASURED_USD_PER_CASE:.4f} per case "
+                f"({MEASURED_SOURCE})"
+            )
+            print(
+                f"  list price {price['input']}/{price['output']} per Mtok, "
+                f"as of {price['as_of']}"
+            )
+        else:
+            print(f"  no recorded price for {model}; cost unknown")
         print("Re-run with --confirm.")
         return 1
 
@@ -192,6 +259,21 @@ def main() -> int:
         prices=PRICING,
     )
     report["wall_clock_seconds"] = round(elapsed, 1)
+    # Which splits produced this number. A report that does not say is a
+    # report whose claim cannot be checked.
+    report["dataset"]["splits"] = list(requested)
+
+    if "holdout" in requested:
+        prompt_now = prompts.get(prompts.DEFAULT_VERSION)
+        entry = holdout.record_access(
+            reason="live-eval",
+            prompt_version=prompt_now.version,
+            prompt_fingerprint=prompt_now.fingerprint(),
+            model=model,
+            case_count=len(cases),
+        )
+        report["holdout_access"] = entry
+        print(f"  holdout access logged: {holdout.ACCESS_LOG}")
     if args.limit:
         # Stated in the report as well as the filename, because a file gets
         # renamed and copied and its name stops being evidence.
@@ -209,7 +291,11 @@ def main() -> int:
     # wrote both to the same path, so a ten-case subset silently replaced a
     # seventy-three-case corpus report - the file still claimed to be "the"
     # live report for the model, with a tenth of the evidence behind it.
-    suffix = f"-first{len(cases)}" if args.limit else ""
+    # The filename says which splits ran, so a development report cannot be
+    # mistaken for a holdout one later.
+    suffix = "-" + "-".join(requested)
+    if args.limit:
+        suffix += f"-first{len(cases)}"
     out = REPORTS / f"live-{model}{suffix}.json"
     out.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 
