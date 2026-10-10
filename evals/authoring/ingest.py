@@ -405,18 +405,6 @@ def to_yaml_cases(report: Report) -> list[dict[str, Any]]:
             "review_status": "reviewed",
             "rights": "synthetic-authored",
         }
-        # C29 grades outcomes against a faithful reference translation, and
-        # that reference needs a fluent author for the same reason the
-        # passages do - a reference written by whoever builds the grader is
-        # not an independent standard. So it is marked pending rather than
-        # filled in, and validate.py reports the count on every run.
-        if authored.category in (
-            "quoted_attack",
-            "task_redirection",
-            "detector_targeting",
-        ):
-            case["translation_status"] = "pending"
-
         if authored.mixed:
             case["category"] = "mixed_language"
             # And the id, which would otherwise say fi-red while the category
@@ -432,6 +420,28 @@ def to_yaml_cases(report: Report) -> list[dict[str, Any]]:
             )
         elif authored.notes:
             case["notes"] = authored.notes
+
+        # Set from the FINAL category, after the MIXED override above.
+        #
+        # The first version set it from the source file's category and then
+        # let the override change the category underneath it, so a mixed case
+        # kept a pending marker that nothing could ever clear - mixed_language
+        # does not take a reference translation, so no later run would remove
+        # it. Four cases carried a permanently stale marker until this was
+        # found by the count failing to reach zero.
+        #
+        # C29 grades outcomes against a faithful reference translation, and
+        # that reference needs a fluent author - a reference written by
+        # whoever builds the grader is not an independent standard. So it is
+        # marked pending rather than filled in, and validate.py reports the
+        # count on every run.
+        if case["category"] in (
+            "quoted_attack",
+            "task_redirection",
+            "detector_targeting",
+        ):
+            case["translation_status"] = "pending"
+
         cases.append(case)
     return cases
 
