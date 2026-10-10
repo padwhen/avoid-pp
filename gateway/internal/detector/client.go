@@ -57,6 +57,19 @@ type AssessmentRequest struct {
 }
 
 // AssessmentResponse is the private 200 body.
+//
+// Every field assessment-response.schema.json permits must appear here, even
+// when the gateway does not forward it. The decoder uses
+// DisallowUnknownFields, so a field the detector may legitimately send and
+// this struct does not declare is a 503 - and that is exactly what happened:
+// C18 added prompt_fingerprint and diagnostics to the detector, the schema
+// permitted them, and this struct did not. Every gateway test used a fake
+// detector that emitted neither, so the live path was the only place it
+// showed, and nothing exercised the live path end to end until C28.
+//
+// The strictness is kept rather than relaxed. It caught a real drift between
+// two services; the failure was that nothing checked this struct against the
+// schema, which TestDecoderAcceptsEverySchemaField now does.
 type AssessmentResponse struct {
 	RequestID  string              `json:"request_id"`
 	Assessment contract.Assessment `json:"assessment"`
@@ -64,7 +77,24 @@ type AssessmentResponse struct {
 	Versions   struct {
 		Detector string `json:"detector"`
 		Prompt   string `json:"prompt"`
+		// Accepted, and not forwarded to the public response: adding it
+		// there is a public contract change and belongs in its own commit.
+		// Accepting it is required, because the detector sends it.
+		PromptFingerprint string `json:"prompt_fingerprint,omitempty"`
 	} `json:"versions"`
+
+	// Non-authoritative provider metrics from C18. Accepted so the detector
+	// can report them, read by nothing here - the gateway's own logging
+	// records what it measured itself, which is the number it can stand
+	// behind.
+	Diagnostics *struct {
+		Model        string `json:"model,omitempty"`
+		LatencyMS    int    `json:"latency_ms,omitempty"`
+		InputTokens  int    `json:"input_tokens,omitempty"`
+		OutputTokens int    `json:"output_tokens,omitempty"`
+		Attempts     int    `json:"attempts,omitempty"`
+		MaxTokens    int    `json:"max_tokens,omitempty"`
+	} `json:"diagnostics,omitempty"`
 }
 
 // Client calls the private assessment endpoint.

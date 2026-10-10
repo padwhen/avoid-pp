@@ -23,7 +23,7 @@ DETECTOR_HOST ?= 127.0.0.1
 DETECTOR_PORT ?= 9000
 
 .DEFAULT_GOAL := help
-.PHONY: check-examples live-translate splits splits-freeze duplicates audit check-splits check-duplicates ingest help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner dev-key run-gateway run-detector up down logs smoke live-smoke live-eval
+.PHONY: demo check-examples live-translate splits splits-freeze duplicates audit check-splits check-duplicates ingest help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner dev-key run-gateway run-detector up down logs smoke live-smoke live-eval
 
 help:
 	@printf '%s\n' \
@@ -36,6 +36,7 @@ help:
 	  'make check-evals      Validate the Finnish seed dataset and report progress' \
 	  'make check-examples   Test the protected-translator example' \
 	  'make live-translate   Translate one Finnish passage live (COSTS MONEY)' \
+	  'make demo             Guard + translator against a running gateway (CONFIRM=yes for live)' \
 	  'make ingest           Convert authored evals/authoring/*.txt into dataset YAML' \
 	  'make splits           Show the dev/validation/holdout split and its statistical power' \
 	  'make splits-freeze    Freeze the split manifest (refuses a degenerate holdout)' \
@@ -116,6 +117,15 @@ live-translate:
 	PYTHONPATH=. $(UV) run --project detector --locked --no-sync python examples/live_translate.py \
 	  $(if $(filter yes,$(CONFIRM)),--confirm,) $(if $(PASSAGE),--passage $(PASSAGE),) \
 	  $(if $(filter yes,$(SHOW_REQUEST)),--show-request,)
+
+# Needs a running gateway. Free with the fake translator; CONFIRM=yes makes
+# the translator live.
+demo:
+	@test -f .env || { echo 'no .env; run `make dev-key` first' >&2; exit 1; }
+	set -a && . ./.env && set +a && \
+	  PYTHONPATH=. $(UV) run --project detector --locked --no-sync python examples/protected_demo.py \
+	  --base-url http://localhost:$${AVOIDPP_HOST_PORT:-8099} \
+	  $(if $(filter yes,$(CONFIRM)),--confirm,) $(if $(filter yes,$(MONITORING)),--monitoring,)
 
 check-evals:
 	$(UV) run --project detector --locked --no-sync python evals/validate.py
