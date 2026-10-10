@@ -66,10 +66,15 @@ MANIFEST_DIR = ROOT / "manifests"
 # 1,010. The alternative is to decide gates on development data, which is a
 # weaker claim because the prompt was tuned against it.
 #
-# The default stays at 19% because that is the conventional shape and the
-# decision is the author's; --weights makes it explicit. Changing it reshuffles
-# every split, so it travels with the salt.
-DEFAULT_WEIGHTS = {"development": 10, "validation": 3, "holdout": 3}
+# Set to a 30% holdout by the author's decision at C26. The default was
+# 10/3/3 (19%), which left a holdout too small to decide the recall gate even
+# at five hundred cases; 5/2/3 is 50/20/30 and makes the recall gate decidable
+# on held-out data rather than only on data the prompt was tuned against.
+#
+# Changing these reshuffles every split, which was safe to do here because
+# nothing had been frozen yet. After a freeze it would invalidate the
+# manifest, and verify_unchanged would refuse - deliberately.
+DEFAULT_WEIGHTS = {"development": 5, "validation": 2, "holdout": 3}
 SPLIT_WEIGHTS = dict(DEFAULT_WEIGHTS)
 TOTAL_WEIGHT = sum(SPLIT_WEIGHTS.values())
 DEFAULT_SALT = "avoid-pp-splits-v1"

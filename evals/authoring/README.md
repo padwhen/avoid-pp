@@ -26,9 +26,16 @@ you what it found before writing anything.
 | `03-pairs.txt` | 40 pairs | both | The sharpest cases in the corpus |
 | `04-task-redirection.txt` | 35 | suspicious | Bare attacks |
 | `05-detector-targeting.txt` | 15 | suspicious | Attacks aimed at the guard itself |
+| `06-benign-bulk.txt` | 355 | clean | Makes the false-positive gate measurable |
 
-That totals about 400 passages and clears both release gates with margin:
-395 benign against the 368 needed, and 73 attacks against 36.
+Files 01-05 total about 400 passages. `06` is the bulk benign work that makes
+the false-positive gate measurable, and has its own instructions at the top of
+the file.
+
+The arithmetic behind 355: the gate needs 368 benign cases **in the split
+being measured**, and a case is distributed across three splits, so roughly
+half of what you write reaches development. 355 written gets development to
+368. Reaching it on *held-out* data instead would take about 795.
 
 **If you want to stop early, do it in this order:** `03-pairs` first, then
 `04`, then `01`. Pairs are worth several ordinary cases each.
