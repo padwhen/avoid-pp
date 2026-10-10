@@ -30,11 +30,8 @@ import logging
 import random
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import TypeVar
 
 logger = logging.getLogger("translation_guard.retry")
-
-T = TypeVar("T")
 
 # Injected so tests run on a fake clock instead of sleeping.
 Clock = Callable[[], float]
@@ -81,7 +78,7 @@ class RetryPolicy:
         return float(base + base * self.jitter * rand())
 
 
-async def run(
+async def run[T](
     operation: Callable[[float], Awaitable[T]],
     policy: RetryPolicy,
     *,
