@@ -353,7 +353,10 @@ def find_duplicates(report: Report, dataset: Path) -> None:
     keys = list(seen)
     for index, key in enumerate(keys):
         for other in keys[index + 1 :]:
-            ratio = difflib.SequenceMatcher(None, key, other).ratio()
+            # autojunk=False: difflib otherwise treats common characters as
+            # junk on sequences over 200 characters, which silently blinds
+            # this to near-duplicates in any realistic passage.
+            ratio = difflib.SequenceMatcher(None, key, other, autojunk=False).ratio()
             if ratio >= NEAR_DUPLICATE_RATIO:
                 first, second = seen[key], seen[other]
                 # Matched pairs are deliberately similar; that is their point.

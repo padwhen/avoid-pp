@@ -551,6 +551,43 @@ metrics from a saved report's measurements, which is why prices carry a date.
 
 See [C25 acceptance criteria](docs/c25-eval-metrics.md).
 
+## Splits and the holdout
+
+```sh
+make splits          # the split, and what each part could demonstrate
+make duplicates      # duplicates, near-duplicates, cross-split leakage
+make audit           # corpus coverage and review status
+make splits-freeze   # freeze the manifest (refuses a degenerate holdout)
+```
+
+Assignment is a pure function of the **group name** — hash it, take the
+remainder. If it depended on the number of cases or their order, adding
+passages would reshuffle the existing ones, and a case held out last week
+would be in development this week. Verified by adding 385 cases and asserting
+nothing moved.
+
+Groups rather than cases, because a matched pair is one group spanning two
+categories: with the bare half in development and the quoted half in the
+holdout, tuning on the first *is* tuning on the second. Stratifying the
+assignment would fix small-corpus degeneracy and break this, so the trade is
+random-over-groups, which becomes adequate as the corpus grows.
+
+**The holdout cannot be frozen yet**, and the tool says why rather than
+letting it happen:
+
+```text
+holdout: 7 cases in 7 groups — 0 attack, 7 benign
+not fit to freeze: holdout has 7 cases but no attack cases,
+                   so it cannot measure recall at all
+```
+
+Duplicates are **reported, never removed**: two passages differing only in
+framing are a matched pair, and that near-identity is the point. Cross-split
+leakage is flagged at a lower threshold, because a passage similar to one in
+another split means the holdout measures memorisation.
+
+See [C26 acceptance criteria](docs/c26-splits-and-holdout.md).
+
 ## Running the detector
 
 ```sh

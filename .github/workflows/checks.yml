@@ -72,6 +72,25 @@ jobs:
       - name: Contract validator self-test
         run: make check-contracts-selftest
 
+      # The evaluation checks were missing from this workflow until C26, so
+      # the dataset validator and the metric fixtures had only ever run
+      # locally - including C25's published-interval checks and the assertion
+      # that both release gates read UNDETERMINED at the seed corpus size.
+      - name: Check dataset
+        run: make check-evals
+
+      - name: Evaluation runner self-test
+        run: make check-evals-runner
+
+      # C26-AC2: splits must stay stable and groups must not span them. These
+      # properties are permanent - a holdout that moved cannot be un-moved,
+      # and nobody would notice from a diff.
+      - name: Split stability and holdout protection
+        run: make check-splits
+
+      - name: Duplicate and leakage review
+        run: make check-duplicates
+
       # C04-AC3: nothing above may depend on a provider credential. Asserted
       # rather than asserted-in-prose, so adding one to this workflow fails.
       - name: No provider credentials required
