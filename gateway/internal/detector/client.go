@@ -1,0 +1,172 @@
+// Package detector calls the private assessment service.
+//
+// Three properties of this client are load-bearing rather than incidental:
+//
+//   - One http.Client is reused for every call. A client constructed per
+//     request gets its own connection pool, which is discarded immediately,
+//     so every scan pays a fresh TCP and TLS handshake and sockets accumulate
+//     in TIME_WAIT under load.
+//   - Response bodies are read through a limit and always drained and closed.
+//     An unbounded read lets a compromised or malfunctioning detector exhaust
+//     the gateway's memory with a single reply.
+//   - Anything unexpected is an error, never a verdict. A malformed body, an
+//     unknown enum, an oversized reply and a timeout all surface as failures.
+//     None of them may become an allow.
+package detector
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"net/url"
+	"time"
+
+	"github.com/padwhen/avoid-pp/gateway/internal/contract"
+)
+
+// MaxResponseBytes bounds a detector reply. An assessment carries a label,
+// a few categories and at most eight bounded quotations; a megabyte is
+// already far more than a well-behaved detector can justify.
+const MaxResponseBytes = 1 << 20 // 1 MiB
+
+// Sentinel errors. Callers map these to HTTP status codes; none of them is
+// ever convertible into a clean assessment.
+var (
+	// ErrUnavailable means the detector could not be reached or refused.
+	ErrUnavailable = errors.New("detector unavailable")
+	// ErrInvalidResponse means the reply could not be trusted: malformed
+	// JSON, unknown fields, an unknown enum, or a mismatched request id.
+	ErrInvalidResponse = errors.New("detector returned an invalid response")
+	// ErrResponseTooLarge means the reply exceeded MaxResponseBytes.
+	ErrResponseTooLarge = errors.New("detector response too large")
+	// ErrDeadlineExceeded means the budget expired before an answer arrived.
+	ErrDeadlineExceeded = errors.New("detector deadline exceeded")
+)
+
+// AssessmentRequest is the private request body.
+type AssessmentRequest struct {
+	RequestID  string           `json:"request_id"`
+	TaskID     contract.TaskID  `json:"task_id"`
+	Content    contract.Content `json:"content"`
+	DeadlineMS int              `json:"deadline_ms,omitempty"`
+}
+
+// AssessmentResponse is the private 200 body.
+type AssessmentResponse struct {
+	RequestID  string              `json:"request_id"`
+	Assessment contract.Assessment `json:"assessment"`
+	Coverage   contract.Coverage   `json:"coverage"`
+	Versions   struct {
+		Detector string `json:"detector"`
+		Prompt   string `json:"prompt"`
+	} `json:"versions"`
+}
+
+// Client calls the private assessment endpoint.
+type Client struct {
+	base *url.URL
+	http *http.Client
+}
+
+// New builds a Client with a reused connection pool.
+func New(base *url.URL, timeout time.Duration) *Client {
+	transport := &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   5 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		MaxIdleConns:        32,
+		MaxIdleConnsPerHost: 32,
+		IdleConnTimeout:     90 * time.Second,
+		TLSHandshakeTimeout: 5 * time.Second,
+	}
+	return &Client{
+		base: base,
+		// No Timeout here: the per-request deadline comes from the caller's
+		// context, so one budget covers the whole scan rather than this hop
+		// restarting a fresh clock.
+		http: &http.Client{Transport: transport},
+	}
+}
+
+// Assess sends one passage and returns a validated assessment.
+func (c *Client) Assess(ctx context.Context, req AssessmentRequest) (*AssessmentResponse, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("encode assessment request: %w", err)
+	}
+
+	endpoint := c.base.JoinPath("internal", "v1", "assessments")
+	httpReq, err := http.NewRequestWithContext(
+		ctx, http.MethodPost, endpoint.String(), bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("build assessment request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Accept", "application/json")
+
+	resp, err := c.http.Do(httpReq)
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return nil, fmt.Errorf("%w: %v", ErrDeadlineExceeded, err)
+		}
+		return nil, fmt.Errorf("%w: %v", ErrUnavailable, err)
+	}
+	// Drain before closing so the connection returns to the pool instead of
+	// being torn down, and bound the drain so a hostile body cannot stall us.
+	defer func() {
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, MaxResponseBytes))
+		_ = resp.Body.Close()
+	}()
+
+	// Read one byte past the limit so the overflow is detectable rather than
+	// silently truncated into valid-looking JSON.
+	limited := io.LimitReader(resp.Body, MaxResponseBytes+1)
+	payload, err := io.ReadAll(limited)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrUnavailable, err)
+	}
+	if len(payload) > MaxResponseBytes {
+		return nil, ErrResponseTooLarge
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%w: detector returned %d", ErrUnavailable, resp.StatusCode)
+	}
+
+	decoder := json.NewDecoder(bytes.NewReader(payload))
+	// A field the gateway does not know about must not be ignored: it may be
+	// a detector trying to smuggle a decision past the policy layer.
+	decoder.DisallowUnknownFields()
+
+	var parsed AssessmentResponse
+	if err := decoder.Decode(&parsed); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidResponse, err)
+	}
+	if decoder.More() {
+		return nil, fmt.Errorf("%w: trailing content after the JSON body", ErrInvalidResponse)
+	}
+
+	if parsed.RequestID != req.RequestID {
+		// A mismatched id means the reply does not belong to this request.
+		return nil, fmt.Errorf("%w: request id mismatch", ErrInvalidResponse)
+	}
+	if err := contract.ValidateAssessment(parsed.Assessment); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidResponse, err)
+	}
+	if parsed.Versions.Detector == "" || parsed.Versions.Prompt == "" {
+		return nil, fmt.Errorf("%w: missing detector or prompt version", ErrInvalidResponse)
+	}
+	if parsed.Coverage.Truncated ||
+		parsed.Coverage.ScannedUTF8Bytes != parsed.Coverage.OriginalUTF8Bytes {
+		// A partial scan is not a complete one, whatever the detector says.
+		return nil, fmt.Errorf("%w: incomplete coverage", ErrInvalidResponse)
+	}
+
+	return &parsed, nil
+}

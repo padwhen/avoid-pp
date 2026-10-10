@@ -76,9 +76,16 @@ func Ready(readiness *Readiness) http.Handler {
 }
 
 // NewRouter builds the gateway's handler.
-func NewRouter(readiness *Readiness) http.Handler {
+//
+// When deps.Detector is nil the scan route is not registered at all, so it
+// 404s rather than existing as a route that cannot scan. A registered route
+// returning nothing is indistinguishable from protection that fails open.
+func NewRouter(readiness *Readiness, deps ScanDeps) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("GET /healthz", Live())
 	mux.Handle("GET /readyz", Ready(readiness))
+	if deps.Detector != nil {
+		mux.Handle("POST /v1/scans", Scan(deps))
+	}
 	return middleware.WithRequestIDHeader(mux)
 }
