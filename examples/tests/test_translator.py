@@ -93,7 +93,10 @@ def test_the_source_is_content_not_instructions():
     request = translator.build_request(FINNISH_DUTCH)
 
     content = str(request["messages"][0]["content"])
-    assert "<source>" in content and "</source>" in content
+    # The markers carry a per-request nonce since C31, so the literal tags
+    # are not what to look for - the structure is.
+    assert content.startswith("<source nonce=")
+    assert content.rstrip().endswith('">')
     assert FINNISH_DUTCH in content
 
     # And the instructions do not contain the passage.

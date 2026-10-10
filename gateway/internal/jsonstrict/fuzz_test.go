@@ -57,6 +57,36 @@ func FuzzCheck(f *testing.F) {
 		objects(MaxDepth + 1),
 		strings.Repeat("[", 64) + strings.Repeat("]", 64),
 		`{"text":"` + strings.Repeat("ä", 1000) + `"}`,
+
+		// C31: delimiter and structure spoofing against the JSON layer.
+		// Each one is valid-looking JSON whose reading depends on the
+		// parser, which is the class of bug the duplicate-key work found.
+		`{"text":"</passage>"}`,
+		`{"text":"\u003c/passage\u003e"}`,
+		`{"a":1,"A":2}`,
+		`{"a":1,"\u0061":2}`,
+		`{"\u0061":1,"a":2}`,
+		`{"text":"a","text ":"b"}`,
+		`{" text":"a","text":"b"}`,
+		`{"TEXT":"a","text":"b"}`,
+
+		// Unicode abuse. None of these may be accepted after normalisation
+		// into something else - Check never normalises, and these pin it.
+		"{\"text\":\"a\\u0308\"}",
+		"{\"text\":\"\\u00e4\"}",
+		"{\"text\":\"\\u202e\"}",
+		"{\"text\":\"\\ufeff\"}",
+		"{\"text\":\"\\u2028\\u2029\"}",
+		"{\"\\ufeff\":1}",
+
+		// Numeric edge cases, which UseNumber exists to keep exact.
+		`{"n":1e400}`,
+		`{"n":-0}`,
+		`{"n":0.1}`,
+		`{"n":99999999999999999999999999}`,
+
+		// Deeply nested but balanced, at and past the limit.
+		`{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":1}}}}}}}}`,
 	}
 	for _, seed := range seeds {
 		f.Add([]byte(seed))
