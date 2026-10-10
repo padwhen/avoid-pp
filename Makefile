@@ -39,11 +39,13 @@ help:
 	  'make demo             Guard + translator against a running gateway (CONFIRM=yes for live)' \
 	  'make ingest           Convert authored evals/authoring/*.txt into dataset YAML' \
 	  'make ingest-translations  Write authored reference translations into the dataset' \
+	  'make outcome-eval     Paired baseline/protected translation outcomes (COSTS MONEY)' \
 	  'make splits           Show the dev/validation/holdout split and its statistical power' \
 	  'make splits-freeze    Freeze the split manifest (refuses a degenerate holdout)' \
 	  'make duplicates       Review duplicates, near-duplicates and cross-split leakage' \
 	  'make audit            Report C26-AC1 corpus coverage and review status' \
 	  'make check-splits     Assert split stability, grouping and holdout protection' \
+	  'make check-spend-guards  Assert no paid tool runs without confirmation' \
 	  'make check-evals-runner  Assert the evaluation runner against a hand-calculated fixture' \
 	  'make dev-key       Generate a development API key into the gitignored .env' \
 	  'make run-gateway   Run the gateway locally (override ADDR= and DETECTOR_URL=)' \
@@ -63,7 +65,7 @@ bootstrap-go:
 bootstrap-python:
 	cd detector && $(UV) sync --locked
 
-check: check-go check-python check-contracts check-contracts-selftest check-examples check-evals check-evals-runner check-splits check-duplicates
+check: check-go check-python check-contracts check-contracts-selftest check-examples check-evals check-evals-runner check-splits check-duplicates check-spend-guards
 
 check-go:
 	@files="$$(cd gateway && $(GOFMT) -l .)" || exit $$?; \
@@ -110,6 +112,11 @@ check-splits:
 # Exact duplicates fail the build; near-duplicates and leakage are reported
 # for the author to judge, because a tool cannot tell a mistake from a
 # deliberately near-identical matched pair.
+# A confirmation check is a safety property, and one without a test is a
+# comment. This exists because a guard silently broke and spent money.
+check-spend-guards:
+	PYTHONPATH=. $(UV) run --project detector --locked --no-sync python evals/spend_guard_selftest.py
+
 check-duplicates:
 	$(UV) run --project detector --locked --no-sync python evals/duplicates.py
 
@@ -183,6 +190,15 @@ down:
 live-smoke:
 	cd detector && $(UV) run --locked --no-sync python ../scripts/live-smoke.py \
 	  $(if $(filter yes,$(CONFIRM)),--confirm,) $(if $(MODEL),--model $(MODEL),)
+
+# Two translations and one scan per case. Never run by CI or by `make check`.
+outcome-eval:
+	@test -f .env || { echo 'no .env; run `make dev-key` first' >&2; exit 1; }
+	set -a && . ./.env && set +a && \
+	  PYTHONPATH=. $(UV) run --project detector --locked --no-sync python evals/outcome_eval.py \
+	  --base-url http://localhost:$${AVOIDPP_HOST_PORT:-8099} \
+	  $(if $(filter yes,$(CONFIRM)),--confirm,) $(if $(LIMIT),--limit $(LIMIT),) $(if $(SAMPLE),--sample $(SAMPLE),) \
+	  $(if $(SPLITS),--splits $(SPLITS),)
 
 live-eval:
 	cd detector && $(UV) run --locked --no-sync python ../evals/live_eval.py \
