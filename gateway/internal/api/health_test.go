@@ -9,6 +9,11 @@ import (
 	"github.com/padwhen/avoid-pp/gateway/internal/middleware"
 )
 
+// healthRouter builds a router with no detector, so only health routes exist.
+func healthRouter(readiness *Readiness) http.Handler {
+	return NewRouter(readiness, ScanDeps{})
+}
+
 func get(t *testing.T, handler http.Handler, path string, header map[string]string) *httptest.ResponseRecorder {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, path, nil)
@@ -34,7 +39,7 @@ func body(t *testing.T, rec *httptest.ResponseRecorder) healthBody {
 // scrape and declares the process dead when that provider wobbles.
 func TestLivenessIgnoresReadiness(t *testing.T) {
 	readiness := NewReadiness()
-	router := NewRouter(readiness)
+	router := healthRouter(readiness)
 
 	rec := get(t, router, "/healthz", nil)
 	if rec.Code != http.StatusOK {
@@ -53,7 +58,7 @@ func TestLivenessIgnoresReadiness(t *testing.T) {
 // C07-AC1: readiness reflects initialisation status.
 func TestReadinessTracksInitialisation(t *testing.T) {
 	readiness := NewReadiness()
-	router := NewRouter(readiness)
+	router := healthRouter(readiness)
 
 	rec := get(t, router, "/readyz", nil)
 	if rec.Code != http.StatusServiceUnavailable {
@@ -78,17 +83,18 @@ func TestReadinessTracksInitialisation(t *testing.T) {
 	}
 }
 
-// The scan endpoint arrives at C09. Until it does, it must 404 rather than
-// exist as a route that quietly returns nothing.
-func TestScanEndpointDoesNotExistYet(t *testing.T) {
-	rec := get(t, NewRouter(NewReadiness()), "/v1/scans", nil)
+// C07 asserted this endpoint did not exist yet. It exists from C09 - but only
+// when a detector is configured. Without one the route is not registered at
+// all, so it 404s rather than answering without the ability to scan.
+func TestScanRouteAbsentWithoutADetector(t *testing.T) {
+	rec := get(t, healthRouter(NewReadiness()), "/v1/scans", nil)
 	if rec.Code != http.StatusNotFound {
-		t.Errorf("GET /v1/scans = %d, want 404 at C07", rec.Code)
+		t.Errorf("POST /v1/scans without a detector = %d, want 404", rec.Code)
 	}
 }
 
 func TestRequestIDIsGeneratedAndEchoed(t *testing.T) {
-	rec := get(t, NewRouter(NewReadiness()), "/healthz", nil)
+	rec := get(t, healthRouter(NewReadiness()), "/healthz", nil)
 	id := rec.Header().Get(middleware.HeaderRequestID)
 	if id == "" {
 		t.Fatal("no request id on the response")
@@ -114,7 +120,7 @@ func TestRequestIDPropagationAndRejection(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			rec := get(t, NewRouter(NewReadiness()), "/healthz",
+			rec := get(t, healthRouter(NewReadiness()), "/healthz",
 				map[string]string{middleware.HeaderRequestID: tc.inbound})
 			got := rec.Header().Get(middleware.HeaderRequestID)
 			if tc.reused && got != tc.inbound {

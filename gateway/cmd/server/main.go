@@ -16,6 +16,7 @@ import (
 
 	"github.com/padwhen/avoid-pp/gateway/internal/api"
 	"github.com/padwhen/avoid-pp/gateway/internal/config"
+	"github.com/padwhen/avoid-pp/gateway/internal/detector"
 	"github.com/padwhen/avoid-pp/gateway/internal/server"
 )
 
@@ -44,11 +45,19 @@ func run() error {
 
 	readiness := api.NewReadiness()
 
+	// One client, reused for every scan: a per-request client would discard
+	// its connection pool each time and handshake afresh.
+	client := detector.New(cfg.DetectorURL, cfg.ScanTimeout)
+
 	srv, err := server.New(server.Options{
-		Addr:    cfg.Addr,
-		Handler: api.NewRouter(readiness),
-		Drain:   cfg.ShutdownTimeout,
-		Log:     log,
+		Addr: cfg.Addr,
+		Handler: api.NewRouter(readiness, api.ScanDeps{
+			Detector: client,
+			Timeout:  cfg.ScanTimeout,
+			Log:      log,
+		}),
+		Drain: cfg.ShutdownTimeout,
+		Log:   log,
 		// Fail readiness the instant draining starts, so new traffic is
 		// routed away while accepted requests finish.
 		OnDrain: readiness.SetNotReady,
@@ -57,8 +66,9 @@ func run() error {
 		return err
 	}
 
-	// Nothing is initialised asynchronously yet. When the detector client
-	// arrives at C09, readiness becomes ready only after that succeeds.
+	// The client is constructed eagerly and has nothing to await, so the
+	// gateway is ready as soon as it is built. Readiness becomes conditional
+	// on a detector health probe when C12 runs both services together.
 	readiness.SetReady()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
