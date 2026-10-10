@@ -23,7 +23,7 @@ DETECTOR_HOST ?= 127.0.0.1
 DETECTOR_PORT ?= 9000
 
 .DEFAULT_GOAL := help
-.PHONY: ingest help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner dev-key run-gateway run-detector up down logs smoke live-smoke live-eval
+.PHONY: splits splits-freeze duplicates audit check-splits check-duplicates ingest help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner dev-key run-gateway run-detector up down logs smoke live-smoke live-eval
 
 help:
 	@printf '%s\n' \
@@ -35,6 +35,11 @@ help:
 	  'make check-contracts-selftest  Prove the contract validator rejects bad data' \
 	  'make check-evals      Validate the Finnish seed dataset and report progress' \
 	  'make ingest           Convert authored evals/authoring/*.txt into dataset YAML' \
+	  'make splits           Show the dev/validation/holdout split and its statistical power' \
+	  'make splits-freeze    Freeze the split manifest (refuses a degenerate holdout)' \
+	  'make duplicates       Review duplicates, near-duplicates and cross-split leakage' \
+	  'make audit            Report C26-AC1 corpus coverage and review status' \
+	  'make check-splits     Assert split stability, grouping and holdout protection' \
 	  'make check-evals-runner  Assert the evaluation runner against a hand-calculated fixture' \
 	  'make dev-key       Generate a development API key into the gitignored .env' \
 	  'make run-gateway   Run the gateway locally (override ADDR= and DETECTOR_URL=)' \
@@ -54,7 +59,7 @@ bootstrap-go:
 bootstrap-python:
 	cd detector && $(UV) sync --locked
 
-check: check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner
+check: check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner check-splits check-duplicates
 
 check-go:
 	@files="$$(cd gateway && $(GOFMT) -l .)" || exit $$?; \
@@ -79,6 +84,27 @@ check-contracts-selftest:
 
 ingest:
 	$(UV) run --project detector --locked --no-sync python evals/authoring/ingest.py $(if $(filter yes,$(WRITE)),--write,)
+
+splits:
+	$(UV) run --project detector --locked --no-sync python evals/splits.py $(if $(WEIGHTS),--weights $(WEIGHTS),)
+
+splits-freeze:
+	$(UV) run --project detector --locked --no-sync python evals/splits.py --freeze $(if $(WEIGHTS),--weights $(WEIGHTS),)
+
+duplicates:
+	$(UV) run --project detector --locked --no-sync python evals/duplicates.py
+
+audit:
+	$(UV) run --project detector --locked --no-sync python evals/audit.py
+
+check-splits:
+	$(UV) run --project detector --locked --no-sync python evals/splits_selftest.py
+
+# Exact duplicates fail the build; near-duplicates and leakage are reported
+# for the author to judge, because a tool cannot tell a mistake from a
+# deliberately near-identical matched pair.
+check-duplicates:
+	$(UV) run --project detector --locked --no-sync python evals/duplicates.py
 
 check-evals:
 	$(UV) run --project detector --locked --no-sync python evals/validate.py
