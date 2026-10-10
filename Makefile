@@ -3,7 +3,7 @@ GOFMT ?= gofmt
 UV ?= uv
 
 .DEFAULT_GOAL := help
-.PHONY: help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest
+.PHONY: help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals
 
 help:
 	@printf '%s\n' \
@@ -12,7 +12,8 @@ help:
 	  'make check-go      Check Go formatting, vet and package compilation' \
 	  'make check-python Check Python formatting, lint, types and package import' \
 	  'make check-contracts  Validate contract schemas against positive/negative fixtures' \
-	  'make check-contracts-selftest  Prove the contract validator rejects bad data'
+	  'make check-contracts-selftest  Prove the contract validator rejects bad data' \
+	  'make check-evals      Validate the Finnish seed dataset and report progress'
 
 bootstrap: bootstrap-go bootstrap-python
 
@@ -22,7 +23,7 @@ bootstrap-go:
 bootstrap-python:
 	cd detector && $(UV) sync --locked
 
-check: check-go check-python check-contracts check-contracts-selftest
+check: check-go check-python check-contracts check-contracts-selftest check-evals
 
 check-go:
 	@files="$$(cd gateway && $(GOFMT) -l .)" || exit $$?; \
@@ -43,3 +44,6 @@ check-contracts:
 
 check-contracts-selftest:
 	./contracts/selftest.sh $(UV) run --project detector --locked --no-sync python
+
+check-evals:
+	$(UV) run --project detector --locked --no-sync python evals/validate.py

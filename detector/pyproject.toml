@@ -13,7 +13,9 @@ dependencies = []
 dev = [
     "jsonschema>=4.26.0",
     "mypy==2.4.0",
+    "pyyaml>=6.0.3",
     "ruff==0.16.10",
+    "types-pyyaml>=6.0.12.20260906",
 ]
 
 [tool.uv]
