@@ -17,6 +17,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/padwhen/avoid-pp/gateway/internal/policy"
 )
 
 // Environment variables read by Load.
@@ -26,6 +28,7 @@ const (
 	EnvScanTimeout     = "AVOIDPP_SCAN_TIMEOUT"
 	EnvShutdownTimeout = "AVOIDPP_SHUTDOWN_TIMEOUT"
 	EnvLogLevel        = "AVOIDPP_LOG_LEVEL"
+	EnvPolicyMode      = "AVOIDPP_POLICY_MODE"
 )
 
 // Defaults are development settings, not promised production behaviour. The
@@ -35,6 +38,10 @@ const (
 	DefaultScanTimeout     = 15 * time.Second
 	DefaultShutdownTimeout = 10 * time.Second
 	DefaultLogLevel        = "info"
+
+	// Monitoring is the default and the only mode available before the
+	// quality gates at C30 are met. Enforcement must be chosen deliberately.
+	DefaultPolicyMode = string(policy.ModeMonitoring)
 
 	// An end-to-end scan budget longer than this is a configuration mistake:
 	// it covers admission wait, internal HTTP, provider work and any retry.
@@ -50,6 +57,7 @@ type Config struct {
 	ScanTimeout     time.Duration
 	ShutdownTimeout time.Duration
 	LogLevel        string
+	PolicyMode      policy.Mode
 }
 
 // Getenv matches os.Getenv and is injected so tests need no process state.
@@ -108,6 +116,14 @@ func Load(getenv Getenv) (*Config, error) {
 		problems = append(problems, fmt.Errorf("%s: %w", EnvShutdownTimeout, err))
 	} else {
 		cfg.ShutdownTimeout = d
+	}
+
+	mode, err := policy.ParseMode(valueOr(strings.ToLower(getenv(EnvPolicyMode)), DefaultPolicyMode))
+	if err != nil {
+		problems = append(problems, fmt.Errorf(
+			"%s: must be monitoring or enforcement", EnvPolicyMode))
+	} else {
+		cfg.PolicyMode = mode
 	}
 
 	if !logLevels[cfg.LogLevel] {

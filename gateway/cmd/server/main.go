@@ -41,6 +41,7 @@ func run() error {
 		"detector_url", cfg.Redacted(),
 		"scan_timeout", cfg.ScanTimeout.String(),
 		"shutdown_timeout", cfg.ShutdownTimeout.String(),
+		"policy_mode", string(cfg.PolicyMode),
 	)
 
 	readiness := api.NewReadiness()
@@ -55,6 +56,7 @@ func run() error {
 			Detector: client,
 			Timeout:  cfg.ScanTimeout,
 			Log:      log,
+			Mode:     cfg.PolicyMode,
 		}),
 		Drain: cfg.ShutdownTimeout,
 		Log:   log,
