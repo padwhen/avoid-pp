@@ -116,6 +116,48 @@ check "unknown task id" \
     422 - '"allow"'
 
 echo
+echo "request validation"
+
+# The duplicate-key smuggle: Go keeps the last value, a parser that keeps the
+# first sees "harmless". Both readings must be refused, not reconciled.
+check "duplicate keys" \
+    '{"task_id":"translate_fi_en_v1","content":{"id":"p","source_type":"translation_input","text":"harmless"},"task_id":"translate_fi_en_v1","content":{"id":"p","source_type":"translation_input","text":"ATTACK"}}' \
+    400 - 'ATTACK'
+
+check "wrong type for text" \
+    '{"task_id":"translate_fi_en_v1","content":{"id":"p","source_type":"translation_input","text":42}}' \
+    422 - '"allow"'
+
+check "a lone surrogate escape" \
+    '{"task_id":"translate_fi_en_v1","content":{"id":"p","source_type":"translation_input","text":"hei \ud800 vaan"}}' \
+    400 - '"allow"'
+
+check "nested too deeply" \
+    "{\"task_id\":\"translate_fi_en_v1\",\"content\":$(printf '{"a":%.0s' $(seq 40))$(printf '{}')$(printf '}%.0s' $(seq 40))}" \
+    400 - '"allow"'
+
+# Content-Type is not assumed: a text/plain body must not be parsed as JSON.
+status="$(curl -sS -o /dev/null -m 15 -w '%{http_code}' -X POST "$SCAN" \
+    -H 'Content-Type: text/plain' -H "$AUTH" \
+    -d "$(body_for p-ct '"hei vaan"')")"
+if [ "$status" = "415" ]; then
+    pass "text/plain body -> HTTP 415"
+else
+    fail "text/plain body -> HTTP $status, want 415"
+fi
+
+# An oversized body must be refused rather than truncated and scanned.
+big="$(printf 'a%.0s' $(seq 70000))"
+status="$(curl -sS -o /dev/null -m 20 -w '%{http_code}' -X POST "$SCAN" \
+    -H 'Content-Type: application/json' -H "$AUTH" \
+    -d "$(body_for p-big "\"$big\"")")"
+if [ "$status" = "413" ]; then
+    pass "oversized body -> HTTP 413"
+else
+    fail "oversized body -> HTTP $status, want 413"
+fi
+
+echo
 echo "authentication"
 
 # $1 label, $2 Authorization header value ("" to omit), $3 expected status

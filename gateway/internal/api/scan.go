@@ -16,9 +16,6 @@ import (
 	"github.com/padwhen/avoid-pp/gateway/internal/policy"
 )
 
-// MaxRequestBytes bounds the public request body before any parsing.
-const MaxRequestBytes = 64 << 10 // 64 KiB
-
 // Assessor is the detector dependency, narrowed to what the handler needs so
 // tests can substitute a fake without an HTTP server.
 type Assessor interface {
@@ -65,30 +62,26 @@ func Scan(deps ScanDeps) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestID := middleware.RequestID(r.Context())
 
-		// Bound the body before reading a byte of it.
-		body := http.MaxBytesReader(w, r.Body, MaxRequestBytes)
-		decoder := json.NewDecoder(body)
-		// A caller must not be able to smuggle a policy or mode field past
-		// validation by having it silently ignored.
-		decoder.DisallowUnknownFields()
-
-		var req contract.ScanRequest
-		if err := decoder.Decode(&req); err != nil {
-			var tooLarge *http.MaxBytesError
-			if errors.As(err, &tooLarge) {
-				writeError(w, r, http.StatusRequestEntityTooLarge,
-					contract.ErrCodePayloadTooLarge, "Request body exceeds the configured limit.")
+		req, err := decodeScanRequest(w, r)
+		if err != nil {
+			var failure decodeFailure
+			if errors.As(err, &failure) {
+				// The reason is logged; the message is what the caller sees.
+				// They are different strings on purpose: parser errors embed
+				// the offending input, and echoing that back would turn an
+				// error response into a reflection channel.
+				log.Info("scan request rejected",
+					"request_id", requestID,
+					"status", failure.status,
+					"code", string(failure.code),
+					"reason", failure.reason)
+				writeError(w, r, failure.status, failure.code, failure.message)
 				return
 			}
-			// The decoder's message embeds the offending input, which is
-			// attacker-controlled, so it is not echoed.
+			log.Error("scan request could not be decoded",
+				"request_id", requestID, "error", err)
 			writeError(w, r, http.StatusBadRequest,
 				contract.ErrCodeMalformedJSON, "Request body is not valid JSON for this schema.")
-			return
-		}
-		if decoder.More() {
-			writeError(w, r, http.StatusBadRequest,
-				contract.ErrCodeMalformedJSON, "Request body contains trailing content.")
 			return
 		}
 
@@ -194,11 +187,11 @@ func validateScanRequest(req contract.ScanRequest) (contract.ErrorCode, string, 
 	if utf8.RuneCountInString(req.Content.Text) > contract.MaxTextChars {
 		return contract.ErrCodeSchemaInvalid, "content.text exceeds the supported length.", false
 	}
-	// Invalid UTF-8 is rejected rather than repaired: a silently replaced byte
-	// changes the passage the caller believes was scanned.
-	if !utf8.ValidString(req.Content.Text) {
-		return contract.ErrCodeSchemaInvalid, "content.text is not valid UTF-8.", false
-	}
+	// There is deliberately no utf8.ValidString check here. It would be dead
+	// code: by this point encoding/json has already substituted U+FFFD for
+	// anything malformed, and U+FFFD is valid UTF-8, so the check would pass
+	// on repaired text every time. The real guard runs against the raw body
+	// before decoding, in decode.go.
 	if hint := req.Content.LanguageHint; hint != "" {
 		if len(hint) < 2 || len(hint) > 3 {
 			return contract.ErrCodeSchemaInvalid, "content.language_hint must be a 2-3 letter code.", false
