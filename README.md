@@ -5,7 +5,7 @@
 A Go/Python workspace for a prompt-injection detection API, initially evaluated
 around Finnish-to-English LLM translation.
 
-**Status: C17 — a real detector with a versioned prompt, validated output, bounded input and bounded retries, behind an opt-in switch.** `make up` starts
+**Status: C18 — a real detector with a versioned prompt, validated output, bounded input and retries, and attributable diagnostics, behind an opt-in switch.** `make up` starts
 both services in containers and the scan endpoint returns an assessment and a
 decision under a configured policy. The detector defaults to a keyword fake
 with no provider calls; live Claude detection is opt-in and costs money per
@@ -230,6 +230,13 @@ provider requests per scan rather than the nine that three reasonable-looking
 layers would silently produce. Every attempt shares one absolute deadline
 rather than getting a fresh clock. See
 [C17 acceptance criteria](docs/c17-retries-and-deadlines.md).
+
+Every assessment carries diagnostics — model, latency, token usage, attempts
+and the output ceiling — plus the SHA-256 of the prompt that ran, so a saved
+report can be checked against the repository without reproducing the prompt.
+Unknown usage is absent rather than zero, because reporting it as zero would
+understate cost in every report that aggregates it. See
+[C18 acceptance criteria](docs/c18-diagnostics.md).
 
 ## Policy
 
