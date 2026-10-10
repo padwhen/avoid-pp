@@ -166,32 +166,56 @@ def check_weights(failures: list[str]) -> None:
 
 
 def check_freeze_blockers(failures: list[str]) -> None:
-    """A degenerate holdout must not be freezable.
+    """A degenerate holdout must not be freezable, and a good one must be.
 
-    The seed corpus produces a holdout with no attack cases, which cannot
-    measure recall by any amount of arithmetic. Freezing it would be worse
-    than waiting, because a frozen holdout is permanent.
+    The first version of this asserted that *the seed corpus* produced a
+    holdout with no attacks. That was true at seventy-three cases and false
+    at five hundred, so the test failed the moment the corpus grew - it had
+    encoded a transient fact as a permanent property.
+
+    The property is about the checker, not about the corpus, so the degenerate
+    case is now constructed deliberately.
     """
-    cases = sm.load_cases(DATASET)
-    manifest = sm.build_manifest(DATASET, sm.assign(cases))
+    # A corpus of benign cases only: every split lacks attacks.
+    benign_only = synthetic(40, "ordinary", "no_injection_detected", "benign")
+    manifest = sm.build_manifest(DATASET, sm.assign(benign_only))
     blockers = sm.freeze_blockers(manifest)
     if not blockers:
         failures.append(
-            "the seed corpus holdout has no attack cases but was reported fit to freeze"
+            "a corpus with no attack cases at all was reported fit to freeze"
         )
     if manifest["fit_to_freeze"]:
-        failures.append("fit_to_freeze is true for a holdout with no attacks")
+        failures.append("fit_to_freeze is true for a corpus with no attacks")
+    if not any("recall" in blocker for blocker in blockers):
+        failures.append(f"the blocker does not mention recall: {blockers}")
 
-    # And a corpus large enough must be freezable, or the check is just a
-    # pessimism machine.
-    grown = copy.deepcopy(cases)
-    grown += synthetic(250, "ordinary", "no_injection_detected", "big-ord")
-    grown += synthetic(75, "task_redirection", "suspicious", "big-red")
-    big = sm.build_manifest(DATASET, sm.assign(grown))
-    if sm.freeze_blockers(big):
+    # And the mirror case: attacks only, so no split can measure a
+    # false-positive rate.
+    attacks_only = synthetic(40, "task_redirection", "suspicious", "attack")
+    attack_manifest = sm.build_manifest(DATASET, sm.assign(attacks_only))
+    attack_blockers = sm.freeze_blockers(attack_manifest)
+    if not any("false-positive" in blocker for blocker in attack_blockers):
         failures.append(
-            f"a {len(grown)}-case corpus was still not fit to freeze: "
-            f"{sm.freeze_blockers(big)}"
+            f"a corpus with no benign cases was not blocked: {attack_blockers}"
+        )
+
+    # An empty split is a blocker in its own right.
+    tiny = sm.build_manifest(
+        DATASET, sm.assign(synthetic(1, "ordinary", "no_injection_detected", "tiny"))
+    )
+    if not sm.freeze_blockers(tiny):
+        failures.append("a one-case corpus was reported fit to freeze")
+
+    # A mixed corpus of reasonable size must be freezable, or the check is
+    # just a pessimism machine.
+    balanced = synthetic(
+        250, "ordinary", "no_injection_detected", "bal-ord"
+    ) + synthetic(75, "task_redirection", "suspicious", "bal-red")
+    big = sm.build_manifest(DATASET, sm.assign(balanced))
+    remaining = sm.freeze_blockers(big)
+    if remaining:
+        failures.append(
+            f"a {len(balanced)}-case balanced corpus was not fit to freeze: {remaining}"
         )
 
 
