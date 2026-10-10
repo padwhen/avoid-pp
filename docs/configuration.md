@@ -14,6 +14,9 @@ trusting it.
 | `AVOIDPP_ADDR` | no | `:8080` | Listen address. Must include a port. |
 | `AVOIDPP_DETECTOR_URL` | yes | — | Base URL of the private detector. |
 | `AVOIDPP_API_KEYS` | yes | — | Caller credentials. Format below. |
+| `AVOIDPP_RATE_CALLER` | no | `1/5` | Per-caller rate/burst. |
+| `AVOIDPP_RATE_GLOBAL` | no | `2/10` | Shared rate/burst across all callers. |
+| `AVOIDPP_RATE_UNAUTHENTICATED` | no | `2/10` | Rate/burst for all failed credentials together. |
 | `AVOIDPP_POLICY_MODE` | no | `monitoring` | `monitoring` or `enforcement`. |
 | `AVOIDPP_SCAN_TIMEOUT` | no | `15s` | End-to-end scan budget, max 60s. |
 | `AVOIDPP_SHUTDOWN_TIMEOUT` | no | `10s` | Drain budget on shutdown. |
@@ -76,6 +79,47 @@ present, and nothing in the configuration would predict that.
 Remove its entry and restart. There is no revocation list and no expiry: the
 configured set is the whole truth, so a key that is absent from it cannot
 authenticate, and there is no second place to check.
+
+## Rate limits
+
+Each value is a `rate/burst` pair: `1/5` admits one request per second
+sustained, with up to five arriving at once. Two numbers in one variable
+because the pair is meaningless split up — a rate without its burst does not
+describe a limit, and nothing good happens when half a pair is overridden.
+
+The defaults come from what a scan costs, not from web-service habit. A live
+Opus scan measured 4.4 seconds and about 1,100 input plus 170 output tokens,
+roughly a cent at the rates recorded in `evals/live_eval.py`. The global
+default of two per second therefore caps a runaway caller near a dollar a
+minute. "A few hundred per second" would put that figure in the thousands.
+These are a spend bound first and a fairness mechanism second.
+
+Startup refuses a global limit below the per-caller limit, in either the rate
+or the burst. Such a configuration reads like a working one and behaves like a
+much tighter one, because no caller could reach its own stated limit.
+
+### These limits are per process
+
+Each gateway instance keeps its own buckets. Two replicas admit twice the
+configured rate; three admit three times. There is no shared counter and no
+coordination.
+
+A deployment that needs a cluster-wide limit must either run a single instance
+or divide the configured rate by the replica count. Which of those is right is
+a deployment decision, not something the gateway can discover about itself.
+
+### Unauthenticated traffic
+
+All failed credentials share one bucket, keyed by nothing at all. Keying by
+source address would be fairer, and would also hand an attacker an unbounded
+map: a million distinct sources would allocate a million buckets, turning the
+rate limiter into a memory-exhaustion primitive.
+
+The cost of one shared bucket is that a flood from a single source can exhaust
+the unauthenticated budget for every other unrecognised caller. That is
+acceptable, because legitimate traffic is authenticated and unaffected, and
+the visible consequence is that unrecognised callers receive 429 instead of
+401 — which discloses less, not more.
 
 ## What is not configurable
 

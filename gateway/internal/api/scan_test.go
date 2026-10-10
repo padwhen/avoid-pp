@@ -16,6 +16,7 @@ import (
 	"github.com/padwhen/avoid-pp/gateway/internal/auth"
 	"github.com/padwhen/avoid-pp/gateway/internal/contract"
 	"github.com/padwhen/avoid-pp/gateway/internal/detector"
+	"github.com/padwhen/avoid-pp/gateway/internal/limits"
 	"github.com/padwhen/avoid-pp/gateway/internal/middleware"
 	"github.com/padwhen/avoid-pp/gateway/internal/policy"
 )
@@ -82,12 +83,25 @@ func routerWithMode(a Assessor, mode policy.Mode) http.Handler {
 		Log:      slog.New(slog.NewTextHandler(io.Discard, nil)),
 		Mode:     mode,
 		Callers:  testRegistry(),
+		Limiter:  permissiveLimitsFor("tests"),
 	})
 }
 
 // testKey is a fixed development credential. It is long enough to satisfy the
 // startup check and is not a secret: it exists only in this file.
 const testKey = "test-key-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+// permissiveLimitsFor mirrors permissiveLimits for the helpers that have no
+// *testing.T to hand.
+func permissiveLimitsFor(callers ...string) *limits.Limiter {
+	big := limits.Bucket{PerSecond: 1e6, Burst: 1e6}
+	limiter, err := limits.New(
+		limits.Config{PerCaller: big, Global: big, Unauthenticated: big}, callers)
+	if err != nil {
+		panic(err)
+	}
+	return limiter
+}
 
 func testRegistry() *auth.Registry {
 	registry, err := auth.NewRegistry([]auth.KeySpec{{

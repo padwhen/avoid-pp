@@ -32,6 +32,7 @@ import (
 	"github.com/padwhen/avoid-pp/gateway/internal/auth"
 	"github.com/padwhen/avoid-pp/gateway/internal/contract"
 	"github.com/padwhen/avoid-pp/gateway/internal/detector"
+	"github.com/padwhen/avoid-pp/gateway/internal/limits"
 	"github.com/padwhen/avoid-pp/gateway/internal/policy"
 )
 
@@ -109,6 +110,7 @@ func newStack(t *testing.T) (http.Handler, *capture) {
 		Log:      slog.New(slog.NewTextHandler(io.Discard, nil)),
 		Mode:     policy.ModeMonitoring,
 		Callers:  testRegistry(t),
+		Limiter:  testLimiter(t),
 	})
 	return router, cap
 }
@@ -127,6 +129,21 @@ func testRegistry(t *testing.T) *auth.Registry {
 		t.Fatalf("build registry: %v", err)
 	}
 	return registry
+}
+
+// testLimiter is permissive on purpose: these tests are about text
+// preservation, and a rate limit firing mid-suite would make them flaky
+// rather than more thorough.
+func testLimiter(t *testing.T) *limits.Limiter {
+	t.Helper()
+	big := limits.Bucket{PerSecond: 1e6, Burst: 1e6}
+	limiter, err := limits.New(
+		limits.Config{PerCaller: big, Global: big, Unauthenticated: big},
+		[]string{"integration"})
+	if err != nil {
+		t.Fatalf("limits.New: %v", err)
+	}
+	return limiter
 }
 
 func scan(t *testing.T, router http.Handler, text, hint string) *httptest.ResponseRecorder {

@@ -21,6 +21,7 @@ import (
 	"github.com/padwhen/avoid-pp/gateway/internal/auth"
 	"github.com/padwhen/avoid-pp/gateway/internal/contract"
 	"github.com/padwhen/avoid-pp/gateway/internal/detector"
+	"github.com/padwhen/avoid-pp/gateway/internal/limits"
 	"github.com/padwhen/avoid-pp/gateway/internal/policy"
 )
 
@@ -104,6 +105,7 @@ func matrixRouter(t *testing.T) (http.Handler, *countingAssessor) {
 		Log:      slog.New(slog.NewTextHandler(io.Discard, nil)),
 		Mode:     policy.ModeMonitoring,
 		Callers:  registry,
+		Limiter:  permissiveLimits(t, "authorised", "second-caller"),
 	}), counter
 }
 
@@ -338,6 +340,7 @@ func TestScanRouteIsAbsentWithoutARegistry(t *testing.T) {
 		Timeout:  time.Second,
 		Log:      slog.New(slog.NewTextHandler(io.Discard, nil)),
 		Mode:     policy.ModeMonitoring,
+		Limiter:  permissiveLimits(t, "authorised"),
 		// Callers deliberately nil.
 	})
 
@@ -443,4 +446,22 @@ func TestRejectionsCarryARequestID(t *testing.T) {
 			}
 		})
 	}
+}
+
+// permissiveLimits is a rate high enough that no behaviour test is
+// accidentally about rate limiting. The limiter's own behaviour is tested in
+// ratelimit_test.go against tight limits and an injected clock, so that the
+// assertions there are exact rather than dependent on how fast the suite runs.
+func permissiveLimits(t *testing.T, callers ...string) *limits.Limiter {
+	t.Helper()
+	if len(callers) == 0 {
+		callers = []string{"tests"}
+	}
+	big := limits.Bucket{PerSecond: 1e6, Burst: 1e6}
+	limiter, err := limits.New(
+		limits.Config{PerCaller: big, Global: big, Unauthenticated: big}, callers)
+	if err != nil {
+		t.Fatalf("limits.New: %v", err)
+	}
+	return limiter
 }

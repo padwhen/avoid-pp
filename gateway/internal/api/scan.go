@@ -12,6 +12,7 @@ import (
 	"github.com/padwhen/avoid-pp/gateway/internal/auth"
 	"github.com/padwhen/avoid-pp/gateway/internal/contract"
 	"github.com/padwhen/avoid-pp/gateway/internal/detector"
+	"github.com/padwhen/avoid-pp/gateway/internal/limits"
 	"github.com/padwhen/avoid-pp/gateway/internal/middleware"
 	"github.com/padwhen/avoid-pp/gateway/internal/policy"
 )
@@ -37,6 +38,10 @@ type ScanDeps struct {
 	// Callers authenticates requests. Like Mode it is configuration: a
 	// request cannot name its own caller, tenant or permitted tasks.
 	Callers *auth.Registry
+
+	// Limiter bounds the arrival rate. Its buckets are allocated from
+	// Callers, so it holds a fixed amount of state.
+	Limiter *limits.Limiter
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {

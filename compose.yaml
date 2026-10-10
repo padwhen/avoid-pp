@@ -52,6 +52,12 @@ services:
       # No default. A development key committed to the repository would be a
       # public credential, so Compose fails here instead of substituting one.
       AVOIDPP_API_KEYS: ${AVOIDPP_API_KEYS:?run `make dev-key` to generate one into .env}
+      # rate/burst. These bound spend before they bound load: a live scan
+      # costs roughly a cent, so the global default caps a runaway loop near
+      # a dollar a minute rather than in the thousands.
+      AVOIDPP_RATE_CALLER: ${AVOIDPP_RATE_CALLER:-1/5}
+      AVOIDPP_RATE_GLOBAL: ${AVOIDPP_RATE_GLOBAL:-2/10}
+      AVOIDPP_RATE_UNAUTHENTICATED: ${AVOIDPP_RATE_UNAUTHENTICATED:-2/10}
       AVOIDPP_LOG_LEVEL: ${AVOIDPP_LOG_LEVEL:-info}
     ports:
       # The only thing published to the host. 8099 by default because 8080 is
