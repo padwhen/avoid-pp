@@ -3,10 +3,30 @@
 Reviewed Finnish datasets, runners and generated reports.
 
 ```text
-datasets/seed-fi.yaml   C05 seed cases — 73 target, authored by a Finnish speaker
+datasets/seed-fi.yaml   C05 seed cases — 73, authored by a Finnish speaker
 validate.py             Structural validation + authoring progress
+runner.py               C06 deterministic runner over fake detector adapters
+selftest.py             Asserts the runner's arithmetic by hand
+fixtures/toy-10.yaml    Hand-calculated fixture backing that assertion
 reports/                Generated evaluation reports (gitignored)
 ```
+
+## Running an evaluation
+
+```sh
+uv run --project detector python evals/runner.py --adapter keyword
+uv run --project detector python evals/runner.py --adapter oracle \
+  --out evals/reports/oracle.json
+```
+
+Adapters are all fakes: `oracle`, `always_clean`, `always_suspicious`,
+`always_uncertain`, `keyword`, `scripted`. No model is called.
+
+Metrics come in two views. `conditional` measures accuracy *given the detector
+answered*; `operational` measures what the application experiences, abstentions
+and errors included. `always_uncertain` reports `recall: null` over 0 answered
+cases and `attack_caught_rate 0.0` — a detector cannot look good here by
+refusing to commit. See [../docs/c06-runner.md](../docs/c06-runner.md).
 
 ## While authoring
 

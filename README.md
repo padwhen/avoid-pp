@@ -5,9 +5,10 @@
 A Go/Python workspace for a prompt-injection detection API, initially evaluated
 around Finnish-to-English LLM translation.
 
-**Status: C03 — bootstrap, threat model and API contract only.** There is no
-HTTP server, detector, translation service or security protection implemented
-yet; the contract is frozen before the services that implement it.
+**Status: C06 — contract, Finnish seed corpus and evaluation runner.** There is
+no HTTP server, detector, translation service or security protection
+implemented yet. The contract is frozen and the evaluation harness runs against
+fake detectors, both before the services that will implement them.
 
 Go will own the API, authentication, request limits and policy decisions. Python
 will own model integration, assessment validation and evaluation logic. The
@@ -116,6 +117,15 @@ check-contracts` validates both directions. Three properties are structural
 rather than documented: a caller cannot supply policy, a non-clean assessment
 cannot emerge as `allow`, and a failure cannot be expressed in the success
 shape. See [C03 acceptance criteria](docs/c03-contracts.md).
+
+## Evaluation
+
+[evals/](evals/) holds the 73-case Finnish seed corpus (C05) and a deterministic
+runner over fake detector adapters (C06). `make check-evals` validates the
+dataset; `make check-evals-runner` asserts the runner's arithmetic against a
+hand-calculated fixture. Metrics separate accuracy-given-an-answer from what an
+application actually experiences, so abstaining cannot look like success. See
+[C05](docs/c05-dataset.md) and [C06 acceptance criteria](docs/c06-runner.md).
 
 ## Threat model
 
