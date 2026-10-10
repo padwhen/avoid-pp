@@ -48,6 +48,37 @@ from translation_guard.validation import InvalidModelOutput, validate
 
 logger = logging.getLogger("translation_guard.claude")
 
+# Account-level 400s that are worth naming, because the fix is specific and
+# nothing else about a 400 suggests it.
+#
+# Matched on a narrow substring of the provider's message, but the string
+# emitted is **ours**. Passing the provider's message through would be the
+# leak C23 closed: an error body can echo the request, and a 400 is exactly
+# where that happens. So the match is read and discarded.
+_ACCOUNT_PROBLEMS = (
+    ("credit balance is too low", "provider credit balance exhausted"),
+    ("billing", "provider billing problem"),
+    ("quota", "provider quota exhausted"),
+)
+
+
+def _permanent_reason(status: int, exc: Exception) -> str:
+    """A safe reason for a non-retryable provider status.
+
+    A bare "provider returned 400" is accurate and useless: it was the answer
+    to 436 consecutive failures whose actual cause was an empty account, and
+    the generic message sent the investigation to the request shape instead of
+    to the billing page.
+    """
+    if status == 400:
+        # str(exc) may contain the request. It is inspected and never kept.
+        lowered = str(exc).lower()
+        for marker, reason in _ACCOUNT_PROBLEMS:
+            if marker in lowered:
+                return reason
+    return f"provider returned {status}"
+
+
 # The prompt is a versioned artifact under translation_guard/prompts, not a
 # string here. Changing its wording means a new version, because a saved
 # evaluation report naming a version is a claim about those exact bytes.
@@ -222,7 +253,7 @@ class ClaudeDetector(Detector):
                 status = exc.status_code
                 if status >= 500:
                     raise retry.RetryableError(f"provider returned {status}") from exc
-                raise retry.PermanentError(f"provider returned {status}") from exc
+                raise retry.PermanentError(_permanent_reason(status, exc)) from exc
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
