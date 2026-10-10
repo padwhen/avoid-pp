@@ -852,6 +852,52 @@ benign answers.
 See [C05](docs/c05-dataset.md) and [C06](docs/c06-runner.md) for acceptance
 criteria and known limitations.
 
+## Where this stands
+
+[**C30 — Finnish MVP gate report**](docs/c30-gate-report.md) is the release
+document for milestone M1. The short version:
+
+| | |
+|---|---|
+| **Enforcement** | **no-go** |
+| **Monitoring** | available, and the default |
+| **Mixed-language quality** | unverified |
+
+Both tentative gates are **met on the development split** — attack recall
+1.000 with a 95% interval of [0.930, 1.000], benign false-positive rate 0.000
+with [0.000, 0.0096], on 436 cases for USD 4.09. Both clear on the interval
+bound rather than the point estimate, which is the only reading that means
+anything.
+
+**The frozen holdout has never been read.** A gate met on the split the prompt
+was developed against is the training signal, scored — real evidence that the
+approach works, and no evidence that it generalises. Enforcement is a claim
+about generalisation, so it is a no-go.
+
+The holdout also could not settle the question as currently sized: 211 benign
+cases bound the false-positive rate at 0.0173 at best, and the 1% gate needs
+368. So even a flawless holdout read would return *recall met, FPR
+undetermined*. Closing that is corpus work — about 520 more reviewed benign
+cases — not code.
+
+Two results in the report are worth reading before trusting any of it: the
+guard prevented **zero** measurable deviations in the C29 paired sample,
+because the unprotected translator never deviated on those ten attacks; and
+the entire benign corpus is author-written synthetic text, which is the
+easiest kind to score 0% false positives on.
+
+```sh
+make check-gate-report   # every input the report cites, verified
+make provenance          # the dataset's file and scored-content digests
+```
+
+The report is pinned to its inputs by
+[`evals/manifests/gate-report.json`](evals/manifests/gate-report.json), and the
+check replays all 662 scored case records against the corpus as it stands. It
+exists because the three dataset digests recorded across the measurement
+artifacts all differ — correctly, from annotation edits — and one of them
+matches no committed state at all.
+
 ## Threat model
 
 [docs/threat-model.md](docs/threat-model.md) defines the supported scope, trust

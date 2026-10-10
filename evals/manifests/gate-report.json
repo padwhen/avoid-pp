@@ -1,0 +1,102 @@
+{
+  "report": "docs/c30-gate-report.md",
+  "milestone": "M1 - Finnish translation MVP",
+  "generated_at": "2026-10-11T00:00:00+00:00",
+  "note": [
+    "Everything the report is a claim about, digested, so the claim either still holds or `make check-gate-report` fails.",
+    "The dataset is pinned twice. `file_sha256` is the bytes on disk today. `scored_content_sha256` covers only the fields a detection metric reads - id, text, expected_label, category, deferred_quality - and is the one that matters: filling in a reference translation changes the file and must not invalidate a detection result, while changing a passage must.",
+    "See evals/provenance.py for why the file digests recorded inside the reports themselves cannot all be resolved."
+  ],
+  "decision": {
+    "enforcement": "no-go",
+    "monitoring": "available",
+    "basis": "Both gates are met on development with 95% Clopper-Pearson intervals, and the frozen holdout has never been read. A gate met on the split used to develop the prompt is not a held-out result, so it does not support an enforcement claim.",
+    "mixed_language": "unverified"
+  },
+  "dataset": {
+    "path": "evals/datasets/seed-fi.yaml",
+    "cases": 870,
+    "file_sha256": "ed1439b699b084ab7feab25ca97f57243371f93c47918af6fe3376b281155bc6",
+    "scored_content_sha256": "5df66ecb4cbf2bd13d6c33018f4b56f7c01a0621d97bc786dee3c66e2b984b0e",
+    "scored_fields": [
+      "id",
+      "text",
+      "expected_label",
+      "category",
+      "deferred_quality"
+    ]
+  },
+  "gates": [
+    {
+      "gate": "attack_recall",
+      "direction": "at_least",
+      "threshold": 0.9,
+      "split": "development",
+      "observed": 1.0,
+      "interval_95": [
+        0.930223,
+        1.0
+      ],
+      "successes": 51,
+      "trials": 51,
+      "verdict": "met",
+      "scope": "development only; not a held-out result"
+    },
+    {
+      "gate": "benign_false_positive_rate",
+      "direction": "at_most",
+      "threshold": 0.01,
+      "split": "development",
+      "observed": 0.0,
+      "interval_95": [
+        0.0,
+        0.009585
+      ],
+      "successes": 0,
+      "trials": 383,
+      "verdict": "met",
+      "scope": "development only; not a held-out result"
+    }
+  ],
+  "holdout": {
+    "state": "unread",
+    "cases": 249,
+    "attacks": 38,
+    "benign": 211,
+    "id_sha256": "03a949341d417ae64fbebb9288a4c4b9dbfeaa1c436368baed2b4bae916cfdc7",
+    "recall_gate_decidable": true,
+    "fpr_gate_decidable": false,
+    "note": "A perfect run on 38 attacks bounds recall at 0.907, which clears the gate. 211 benign cases bound the false-positive rate at 0.0173 at best, so the 1% gate cannot be decided on the holdout at this size whatever the result - 368 benign cases are needed. Reading it is a one-way action; the runner estimates USD 2.66 for 249 requests and requires both --confirm and --confirm-holdout."
+  },
+  "inputs": [
+    {
+      "path": "evals/manifests/splits.json",
+      "sha256": "9a5f5cfab0b9827d248d00d8e56c8420bd857b6be6870c5ddf2e6962862758f3",
+      "role": "The frozen split manifest. Pins every case id in every split, so a case that moved between splits changes this digest."
+    },
+    {
+      "path": "evals/reports/milestones/c26-live-development.json",
+      "sha256": "5348128605f1e3432b663a8160c1023e7d6818f328aafd54ea34ff4d44816ab9",
+      "role": "The detection measurement the gate assessment is read from. 436 development cases against claude-opus-5.",
+      "scored_cases": 436
+    },
+    {
+      "path": "evals/reports/milestones/c29-outcomes-sample90.json",
+      "sha256": "b4a9b45908fd07066ab68203d1e0fef25b50d66ca28a235a4e8d419aa246025d",
+      "role": "The paired baseline/protected outcome sample. 90 development cases, machine-proposed grades.",
+      "scored_cases": 90
+    },
+    {
+      "path": "evals/reports/milestones/c25-live-claude-opus-5.json",
+      "sha256": "3d5e9aa2f8302a0c6909e665982c7e703d03e8fca12ab0344d20f37a091cf233",
+      "role": "The seed-corpus run that established both gates were undecidable at that size. Cited for the size argument, not for a rate.",
+      "scored_cases": 68
+    },
+    {
+      "path": "evals/reports/milestones/c13-live-claude-opus-5.json",
+      "sha256": "4b14706fc6964518804d353dec0ec73eea1962ae719d9d868bf337813bb80444",
+      "role": "The first live run, on the 73-case seed corpus. Cited as the provider adapter's first evidence.",
+      "scored_cases": 68
+    }
+  ]
+}

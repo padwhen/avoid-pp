@@ -23,7 +23,7 @@ DETECTOR_HOST ?= 127.0.0.1
 DETECTOR_PORT ?= 9000
 
 .DEFAULT_GOAL := help
-.PHONY: check-sdk check-sdk-go check-sdk-python demo check-examples live-translate splits splits-freeze duplicates audit check-splits check-duplicates ingest help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner dev-key run-gateway run-detector up down logs smoke live-smoke live-eval
+.PHONY: check-gate-report provenance check-sdk check-sdk-go check-sdk-python demo check-examples live-translate splits splits-freeze duplicates audit check-splits check-duplicates ingest help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner dev-key run-gateway run-detector up down logs smoke live-smoke live-eval
 
 help:
 	@printf '%s\n' \
@@ -34,6 +34,8 @@ help:
 	  'make check-contracts  Validate contract schemas against positive/negative fixtures' \
 	  'make check-contracts-selftest  Prove the contract validator rejects bad data' \
 	  'make check-sdk        Test both SDK clients against the shared expectations table' \
+	  'make check-gate-report  Verify every input the C30 gate report is a claim about' \
+	  'make provenance       Print the dataset file and scored-content digests' \
 	  'make check-evals      Validate the Finnish seed dataset and report progress' \
 	  'make check-examples   Test the protected-translator example' \
 	  'make live-translate   Translate one Finnish passage live (COSTS MONEY)' \
@@ -67,7 +69,7 @@ bootstrap-go:
 bootstrap-python:
 	cd detector && $(UV) sync --locked
 
-check: check-go check-python check-contracts check-contracts-selftest check-sdk check-examples check-evals check-evals-runner check-splits check-duplicates check-spend-guards
+check: check-go check-python check-contracts check-contracts-selftest check-sdk check-examples check-evals check-evals-runner check-splits check-duplicates check-spend-guards check-gate-report
 
 check-go:
 	@files="$$(cd gateway && $(GOFMT) -l .)" || exit $$?; \
@@ -129,6 +131,16 @@ audit:
 
 check-splits:
 	$(UV) run --project detector --locked --no-sync python evals/splits_selftest.py
+
+# A published report is a claim about specific inputs. This asserts they have
+# not moved: the dataset's scored content, the frozen split manifest, and the
+# four measurement reports the report cites - plus a replay of all 662 scored
+# case records against the corpus as it stands.
+check-gate-report:
+	$(UV) run --project detector --locked --no-sync python evals/provenance.py --check
+
+provenance:
+	$(UV) run --project detector --locked --no-sync python evals/provenance.py
 
 # Exact duplicates fail the build; near-duplicates and leakage are reported
 # for the author to judge, because a tool cannot tell a mistake from a
@@ -221,7 +233,12 @@ outcome-eval:
 	  $(if $(filter yes,$(CONFIRM)),--confirm,) $(if $(LIMIT),--limit $(LIMIT),) $(if $(SAMPLE),--sample $(SAMPLE),) \
 	  $(if $(SPLITS),--splits $(SPLITS),)
 
+# SPLITS defaults to development,validation inside the runner. Reading the
+# holdout needs CONFIRM_HOLDOUT=yes as well as CONFIRM=yes, and the access is
+# logged - it is a one-way action, so it takes two deliberate flags rather
+# than one. The C30 gate report documents this command; it has to work.
 live-eval:
 	cd detector && $(UV) run --locked --no-sync python ../evals/live_eval.py \
 	  $(if $(filter yes,$(CONFIRM)),--confirm,) $(if $(MODEL),--model $(MODEL),) \
-	  $(if $(LIMIT),--limit $(LIMIT),)
+	  $(if $(LIMIT),--limit $(LIMIT),) $(if $(SPLITS),--splits $(SPLITS),) \
+	  $(if $(filter yes,$(CONFIRM_HOLDOUT)),--confirm-holdout,)
