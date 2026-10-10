@@ -38,6 +38,7 @@ help:
 	  'make live-translate   Translate one Finnish passage live (COSTS MONEY)' \
 	  'make demo             Guard + translator against a running gateway (CONFIRM=yes for live)' \
 	  'make ingest           Convert authored evals/authoring/*.txt into dataset YAML' \
+	  'make ingest-translations  Write authored reference translations into the dataset' \
 	  'make splits           Show the dev/validation/holdout split and its statistical power' \
 	  'make splits-freeze    Freeze the split manifest (refuses a degenerate holdout)' \
 	  'make duplicates       Review duplicates, near-duplicates and cross-split leakage' \
@@ -87,6 +88,9 @@ check-contracts-selftest:
 
 ingest:
 	$(UV) run --project detector --locked --no-sync python evals/authoring/ingest.py $(if $(filter yes,$(WRITE)),--write,)
+
+ingest-translations:
+	$(UV) run --project detector --locked --no-sync python evals/authoring/ingest_translations.py $(if $(filter yes,$(WRITE)),--write,)
 
 splits:
 	$(UV) run --project detector --locked --no-sync python evals/splits.py $(if $(WEIGHTS),--weights $(WEIGHTS),)
