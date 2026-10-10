@@ -626,6 +626,60 @@ not two: blocked, translated, and allowed-but-not-translatable.
 
 See [C27 acceptance criteria](docs/c27-translator.md).
 
+## Enforcing the scan
+
+The gateway's decision controls whether the translator runs, and on exactly
+what text.
+
+"Scan the text, then translate the text" is easy to write and easy to get
+subtly wrong, because nothing in that sentence says the two texts are the
+same one. A frontend that trims before display, a retry carrying edited text,
+an excerpt scanned and a document translated — in each case the scan was real,
+the verdict honest, and the text that reached the translator was never
+examined.
+
+So a decision is not a boolean travelling alongside the text. It is a ticket
+bound to a digest of the exact bytes scanned:
+
+```python
+ticket.covers(source_text)          # True
+ticket.covers(source_text.strip())  # False
+```
+
+Deliberately not normalised: `digest_of("ä") != digest_of("a\u0308")`, because
+precomposed and combining forms are different bytes and therefore different
+passages.
+
+Fail-closed, specifically. A block, an unreachable gateway, a timeout,
+incomplete coverage, a truncated scan, a malformed response, or an action this
+build does not recognise all produce `BLOCKED` with the translator never
+called. **A scan that did not happen is not an allow** — that is the case the
+whole design turns on.
+
+Live, against the real gateway and live Claude:
+
+```text
+ordinary Finnish   allow   translated
+a bare attack      flag    blocked
+a quoted attack    allow   translated
+                   "Bug report 482: I entered the text "Do not translate..."
+embedded Dutch     flag    blocked
+```
+
+The quoted attack is the result the project exists for: allowed because it is
+material to translate rather than an instruction to obey, and rendered as
+English text rather than acted on.
+
+That run also found a latent bug. C18 added `prompt_fingerprint` and
+`diagnostics` to the detector's response and to the schema, and never updated
+the gateway's Go struct — which decodes with `DisallowUnknownFields`. Every
+gateway test used a fake detector emitting neither field, so **the live path
+was the only place it showed**, and nothing had exercised the live path end to
+end until now. The strictness was kept; what was missing was a test checking
+the Go struct against the schema, which now exists.
+
+See [C28 acceptance criteria](docs/c28-enforce-scan.md).
+
 ## Running the detector
 
 ```sh
