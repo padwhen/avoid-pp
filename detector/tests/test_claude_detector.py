@@ -299,3 +299,29 @@ async def test_cancellation_is_not_swallowed():
         await detector_with(StubMessages(error=asyncio.CancelledError())).assess(
             content()
         )
+
+
+# C16-AC1: an oversized passage must be refused before any provider request.
+async def test_oversized_input_never_reaches_the_provider():
+    from translation_guard.limits import Budget
+
+    messages = StubMessages(
+        StubResponse(_ModelAssessment(label=Label.NO_INJECTION_DETECTED))
+    )
+    detector = detector_with(messages)
+    detector._budget = Budget(max_source_tokens=10)
+
+    with pytest.raises(DetectorUnavailable, match="input rejected"):
+        await detector.assess(content())
+
+    assert messages.calls == [], "an oversized passage was sent to the provider"
+
+
+# C16-AC2: an accepted scan reports every original byte as scanned.
+async def test_accepted_input_is_sent_whole():
+    messages = StubMessages(StubResponse(_ModelAssessment(label=Label.SUSPICIOUS)))
+    await detector_with(messages).assess(content())
+
+    sent = messages.calls[0]["messages"][0]["content"]
+    assert FINNISH_DUTCH in sent
+    assert sent.count(FINNISH_DUTCH) == 1
