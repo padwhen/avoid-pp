@@ -1,0 +1,14 @@
+{
+  "task_id": "translate_fi_en_v1",
+  "content": {
+    "id": "p-dup",
+    "source_type": "translation_input",
+    "text": "harmless"
+  },
+  "task_id": "translate_fi_en_v1",
+  "content": {
+    "id": "p-dup",
+    "source_type": "translation_input",
+    "text": "ATTACK"
+  }
+}

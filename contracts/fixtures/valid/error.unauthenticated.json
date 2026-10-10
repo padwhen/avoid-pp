@@ -1,0 +1,7 @@
+{
+  "request_id": "req-unauthenticated",
+  "error": {
+    "code": "unauthenticated",
+    "message": "Valid credentials are required."
+  }
+}

@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -26,12 +27,28 @@ import (
 // countingAssessor records every call it receives and would answer cleanly.
 // A rejected request reaching it is a silent failure otherwise: the response
 // would still be a 401 while the provider bill went up.
-type countingAssessor struct{ calls atomic.Int64 }
+type countingAssessor struct {
+	calls atomic.Int64
+	// text records the passage of the most recent call, so a test can assert
+	// what actually reached the detector rather than what was sent.
+	mu   sync.Mutex
+	text string
+}
+
+// lastText returns the passage the detector most recently received.
+func (c *countingAssessor) lastText() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.text
+}
 
 func (c *countingAssessor) Assess(
 	_ context.Context, req detector.AssessmentRequest,
 ) (*detector.AssessmentResponse, error) {
 	c.calls.Add(1)
+	c.mu.Lock()
+	c.text = req.Content.Text
+	c.mu.Unlock()
 	response := &detector.AssessmentResponse{
 		Assessment: contract.Assessment{
 			Label:      contract.LabelNoInjectionDetected,
