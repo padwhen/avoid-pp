@@ -9,6 +9,7 @@ the logs.
 from __future__ import annotations
 
 from enum import StrEnum
+from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -19,17 +20,23 @@ class DetectorMode(StrEnum):
 
     ``fake`` is the default so a clean checkout, the test suite and ordinary
     pull-request CI all work with no API key and no provider spend. ``live``
-    arrives at C13.
+    must be chosen deliberately, because it costs money on every scan.
     """
 
     FAKE = "fake"
+    LIVE = "live"
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="AVOIDPP_DETECTOR_",
-        extra="forbid",
+        extra="ignore",
         frozen=True,
+        # The repository-root .env holds the provider key. populate_by_name
+        # lets api_key be read from LLM_API_KEY rather than the prefixed name.
+        env_file=(Path(__file__).resolve().parents[3] / ".env", ".env"),
+        env_file_encoding="utf-8",
+        populate_by_name=True,
     )
 
     mode: DetectorMode = DetectorMode.FAKE
@@ -41,7 +48,18 @@ class Settings(BaseSettings):
     detector_version: str = Field(default="fake-0", min_length=1)
     prompt_version: str = Field(default="none", min_length=1)
 
+    # Provider credential. Read from LLM_API_KEY, which is what the key is
+    # called in the repository-root .env. Never logged, never echoed in an
+    # error: config errors name the variable, not the value.
+    api_key: str | None = Field(default=None, alias="LLM_API_KEY")
+
+    # Model identifier, configurable so a cheaper or newer model can be
+    # evaluated without a code change. The response records which one ran.
+    model: str = Field(default="claude-opus-5", min_length=1)
+
+    # Per-request ceiling. The gateway's deadline still wins when it is lower.
+    request_timeout_seconds: float = Field(default=15.0, gt=0, le=120)
+
     # Set to force initialisation to fail, so readiness can be exercised
-    # without a real dependency to break. Tests rely on this; C13 replaces it
-    # with the provider client's own startup check.
+    # without a real dependency to break.
     fail_initialisation: bool = False
