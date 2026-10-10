@@ -100,6 +100,12 @@ jobs:
       - name: Duplicate and leakage review
         run: make check-duplicates
 
+      # C30: the gate report cites four measurement reports and a corpus. A
+      # published number that quietly stops describing its inputs is worse
+      # than no number, so the citation is checked rather than trusted.
+      - name: Gate report provenance
+        run: make check-gate-report
+
       # A paid tool that runs without confirmation is a bug that costs money.
       # One did, so the guard now has a test.
       - name: Spend guards
