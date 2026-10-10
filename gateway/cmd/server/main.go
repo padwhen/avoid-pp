@@ -20,6 +20,7 @@ import (
 	"github.com/padwhen/avoid-pp/gateway/internal/config"
 	"github.com/padwhen/avoid-pp/gateway/internal/detector"
 	"github.com/padwhen/avoid-pp/gateway/internal/limits"
+	"github.com/padwhen/avoid-pp/gateway/internal/obs"
 	"github.com/padwhen/avoid-pp/gateway/internal/server"
 )
 
@@ -132,5 +133,8 @@ func newLogger(level string) *slog.Logger {
 	default:
 		lvl = slog.LevelInfo
 	}
-	return slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: lvl}))
+	// The filtering handler, not slog.NewJSONHandler directly. Every log line
+	// in this process goes through the allowlist, so a field added at a call
+	// site cannot emit a passage or a credential.
+	return slog.New(obs.NewHandler(os.Stdout, lvl))
 }
