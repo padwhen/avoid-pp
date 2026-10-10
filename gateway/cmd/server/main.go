@@ -1,9 +1,8 @@
 // Command server runs the avoid-pp gateway.
 //
-// At C07 it serves health endpoints only. There is no scan endpoint, no
-// detector call and no policy: this commit establishes the lifecycle that
-// later behaviour is added to, because configuration validation, readiness
-// and bounded shutdown are expensive to retrofit into working handlers.
+// It validates its configuration before binding a port, serves health
+// endpoints openly and the scan endpoint only to authenticated callers, and
+// shuts down by draining rather than cutting accepted requests short.
 package main
 
 import (
@@ -12,9 +11,11 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/padwhen/avoid-pp/gateway/internal/api"
+	"github.com/padwhen/avoid-pp/gateway/internal/auth"
 	"github.com/padwhen/avoid-pp/gateway/internal/config"
 	"github.com/padwhen/avoid-pp/gateway/internal/detector"
 	"github.com/padwhen/avoid-pp/gateway/internal/server"
@@ -42,6 +43,10 @@ func run() error {
 		"scan_timeout", cfg.ScanTimeout.String(),
 		"shutdown_timeout", cfg.ShutdownTimeout.String(),
 		"policy_mode", string(cfg.PolicyMode),
+		// Names and key counts, never keys. The count is what an operator
+		// checks after a rotation to confirm the replaced key is gone.
+		"callers", callerNames(cfg.Callers),
+		"configured_keys", cfg.Callers.KeyCount(),
 	)
 
 	readiness := api.NewReadiness()
@@ -57,6 +62,7 @@ func run() error {
 			Timeout:  cfg.ScanTimeout,
 			Log:      log,
 			Mode:     cfg.PolicyMode,
+			Callers:  cfg.Callers,
 		}),
 		Drain: cfg.ShutdownTimeout,
 		Log:   log,
@@ -77,6 +83,16 @@ func run() error {
 	defer stop()
 
 	return srv.Run(ctx)
+}
+
+// callerNames renders the configured callers for one startup log line.
+func callerNames(registry *auth.Registry) []string {
+	callers := registry.Callers()
+	out := make([]string, len(callers))
+	for i, caller := range callers {
+		out[i] = caller.Name + "=" + strings.Join(caller.Tasks(), "+")
+	}
+	return out
 }
 
 func newLogger(level string) *slog.Logger {

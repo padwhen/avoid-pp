@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/padwhen/avoid-pp/gateway/internal/auth"
 	"github.com/padwhen/avoid-pp/gateway/internal/policy"
 )
 
@@ -58,6 +59,10 @@ type Config struct {
 	ShutdownTimeout time.Duration
 	LogLevel        string
 	PolicyMode      policy.Mode
+
+	// Callers is the authenticated caller set. It holds key digests, not
+	// keys, so a Config that reaches a log or a dump carries no credential.
+	Callers *auth.Registry
 }
 
 // Getenv matches os.Getenv and is injected so tests need no process state.
@@ -124,6 +129,14 @@ func Load(getenv Getenv) (*Config, error) {
 			"%s: must be monitoring or enforcement", EnvPolicyMode))
 	} else {
 		cfg.PolicyMode = mode
+	}
+
+	if specs, err := parseAPIKeys(getenv(EnvAPIKeys)); err != nil {
+		problems = append(problems, err)
+	} else if registry, err := auth.NewRegistry(specs); err != nil {
+		problems = append(problems, fmt.Errorf("%s: %w", EnvAPIKeys, err))
+	} else {
+		cfg.Callers = registry
 	}
 
 	if !logLevels[cfg.LogLevel] {

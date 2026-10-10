@@ -77,15 +77,23 @@ func Ready(readiness *Readiness) http.Handler {
 
 // NewRouter builds the gateway's handler.
 //
-// When deps.Detector is nil the scan route is not registered at all, so it
-// 404s rather than existing as a route that cannot scan. A registered route
-// returning nothing is indistinguishable from protection that fails open.
+// The scan route is registered only when it can be served safely: a nil
+// detector means it cannot scan, and a nil caller registry means it cannot
+// tell who is asking. In either case the route is absent and 404s, rather
+// than existing in a degraded form — a registered route that scans nothing,
+// or one that scans for anybody, are both worse than a missing route.
+//
+// Authentication wraps the scan route alone. The health endpoints stay open
+// because a load balancer probing readiness holds no credential, and what
+// they disclose is whether the process is up, which its open port already
+// says.
 func NewRouter(readiness *Readiness, deps ScanDeps) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("GET /healthz", Live())
 	mux.Handle("GET /readyz", Ready(readiness))
-	if deps.Detector != nil {
-		mux.Handle("POST /v1/scans", Scan(deps))
+	if deps.Detector != nil && deps.Callers != nil {
+		mux.Handle("POST /v1/scans",
+			Authenticate(deps.Callers, deps.Log)(Scan(deps)))
 	}
 	return middleware.WithRequestIDHeader(mux)
 }

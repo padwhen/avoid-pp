@@ -10,8 +10,15 @@ func env(pairs map[string]string) Getenv {
 	return func(key string) string { return pairs[key] }
 }
 
+// testKeys is a syntactically valid AVOIDPP_API_KEYS value. The key is long
+// enough to pass the startup entropy check and is not a secret.
+const testKeys = "lukea:translate_fi_en_v1:config-test-key-cccccccccccccccccccc"
+
 func valid() map[string]string {
-	return map[string]string{EnvDetectorURL: "http://detector:9000"}
+	return map[string]string{
+		EnvDetectorURL: "http://detector:9000",
+		EnvAPIKeys:     testKeys,
+	}
 }
 
 func TestLoadAppliesDefaults(t *testing.T) {
@@ -40,6 +47,7 @@ func TestLoadOverrides(t *testing.T) {
 		EnvScanTimeout:     "5s",
 		EnvShutdownTimeout: "2s",
 		EnvLogLevel:        "DEBUG",
+		EnvAPIKeys:         testKeys,
 	}))
 	if err != nil {
 		t.Fatalf("Load() error = %v, want nil", err)
@@ -154,6 +162,16 @@ func TestLoadErrorsNeverEchoValues(t *testing.T) {
 			EnvDetectorURL: "http://d:1",
 			EnvAddr:        secret,
 		},
+		// C19-AC3: the keys variable holds credentials outright, so its
+		// errors are the ones that most need to stay quiet about values.
+		"a bare key with no caller or tasks": {
+			EnvDetectorURL: "http://d:1",
+			EnvAPIKeys:     secret,
+		},
+		"a well-formed entry whose key is too short": {
+			EnvDetectorURL: "http://d:1",
+			EnvAPIKeys:     "lukea:translate_fi_en_v1:" + secret[:8],
+		},
 	}
 
 	for name, environment := range cases {
@@ -177,6 +195,7 @@ func TestLoadErrorsNeverEchoValues(t *testing.T) {
 func TestRedactedStripsCredentials(t *testing.T) {
 	cfg, err := Load(env(map[string]string{
 		EnvDetectorURL: "https://user:hunter2@detector.internal:8443/base",
+		EnvAPIKeys:     testKeys,
 	}))
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
@@ -211,6 +230,7 @@ func TestLoadPolicyModeAcceptsEnforcement(t *testing.T) {
 	cfg, err := Load(env(map[string]string{
 		EnvDetectorURL: "http://d:1",
 		EnvPolicyMode:  "ENFORCEMENT",
+		EnvAPIKeys:     testKeys,
 	}))
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)

@@ -100,6 +100,8 @@ const (
 	ErrCodeMalformedJSON       ErrorCode = "malformed_json"
 	ErrCodeSchemaInvalid       ErrorCode = "schema_invalid"
 	ErrCodeUnknownTaskID       ErrorCode = "unknown_task_id"
+	ErrCodeUnauthenticated     ErrorCode = "unauthenticated"
+	ErrCodeUnauthorizedTask    ErrorCode = "unauthorized_task"
 	ErrCodePayloadTooLarge     ErrorCode = "payload_too_large"
 	ErrCodeDetectorUnavailable ErrorCode = "detector_unavailable"
 	ErrCodeDeadlineExceeded    ErrorCode = "deadline_exceeded"
@@ -110,6 +112,13 @@ const (
 type TaskID string
 
 const TaskTranslateFiEnV1 TaskID = "translate_fi_en_v1"
+
+// Valid reports whether this contract version defines the task.
+//
+// Go unmarshals any string into a named string type without complaint, so
+// an unrecognised task has to be rejected explicitly or it travels onward
+// looking well-typed.
+func (t TaskID) Valid() bool { return t == TaskTranslateFiEnV1 }
 
 // SourceType describes what a passage is. It never widens trust.
 type SourceType string

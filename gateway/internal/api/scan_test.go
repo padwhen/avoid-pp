@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/padwhen/avoid-pp/gateway/internal/auth"
 	"github.com/padwhen/avoid-pp/gateway/internal/contract"
 	"github.com/padwhen/avoid-pp/gateway/internal/detector"
 	"github.com/padwhen/avoid-pp/gateway/internal/middleware"
@@ -80,13 +81,32 @@ func routerWithMode(a Assessor, mode policy.Mode) http.Handler {
 		Timeout:  2 * time.Second,
 		Log:      slog.New(slog.NewTextHandler(io.Discard, nil)),
 		Mode:     mode,
+		Callers:  testRegistry(),
 	})
+}
+
+// testKey is a fixed development credential. It is long enough to satisfy the
+// startup check and is not a secret: it exists only in this file.
+const testKey = "test-key-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+func testRegistry() *auth.Registry {
+	registry, err := auth.NewRegistry([]auth.KeySpec{{
+		Name:  "tests",
+		Key:   testKey,
+		Tasks: []contract.TaskID{contract.TaskTranslateFiEnV1},
+	}})
+	if err != nil {
+		panic(err)
+	}
+	return registry
 }
 
 func postScan(t *testing.T, handler http.Handler, body string, headers map[string]string) *httptest.ResponseRecorder {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodPost, "/v1/scans", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+testKey)
+	// Set after the credential so a case can deliberately override it.
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
