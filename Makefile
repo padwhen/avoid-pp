@@ -23,7 +23,7 @@ DETECTOR_HOST ?= 127.0.0.1
 DETECTOR_PORT ?= 9000
 
 .DEFAULT_GOAL := help
-.PHONY: splits splits-freeze duplicates audit check-splits check-duplicates ingest help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner dev-key run-gateway run-detector up down logs smoke live-smoke live-eval
+.PHONY: check-examples live-translate splits splits-freeze duplicates audit check-splits check-duplicates ingest help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner dev-key run-gateway run-detector up down logs smoke live-smoke live-eval
 
 help:
 	@printf '%s\n' \
@@ -34,6 +34,8 @@ help:
 	  'make check-contracts  Validate contract schemas against positive/negative fixtures' \
 	  'make check-contracts-selftest  Prove the contract validator rejects bad data' \
 	  'make check-evals      Validate the Finnish seed dataset and report progress' \
+	  'make check-examples   Test the protected-translator example' \
+	  'make live-translate   Translate one Finnish passage live (COSTS MONEY)' \
 	  'make ingest           Convert authored evals/authoring/*.txt into dataset YAML' \
 	  'make splits           Show the dev/validation/holdout split and its statistical power' \
 	  'make splits-freeze    Freeze the split manifest (refuses a degenerate holdout)' \
@@ -59,7 +61,7 @@ bootstrap-go:
 bootstrap-python:
 	cd detector && $(UV) sync --locked
 
-check: check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner check-splits check-duplicates
+check: check-go check-python check-contracts check-contracts-selftest check-examples check-evals check-evals-runner check-splits check-duplicates
 
 check-go:
 	@files="$$(cd gateway && $(GOFMT) -l .)" || exit $$?; \
@@ -105,6 +107,15 @@ check-splits:
 # deliberately near-identical matched pair.
 check-duplicates:
 	$(UV) run --project detector --locked --no-sync python evals/duplicates.py
+
+check-examples:
+	PYTHONPATH=. $(UV) run --project detector --locked --no-sync python -m pytest examples/tests -q
+
+# Costs money. Never run by CI or by `make check`.
+live-translate:
+	PYTHONPATH=. $(UV) run --project detector --locked --no-sync python examples/live_translate.py \
+	  $(if $(filter yes,$(CONFIRM)),--confirm,) $(if $(PASSAGE),--passage $(PASSAGE),) \
+	  $(if $(filter yes,$(SHOW_REQUEST)),--show-request,)
 
 check-evals:
 	$(UV) run --project detector --locked --no-sync python evals/validate.py

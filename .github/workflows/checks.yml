@@ -72,6 +72,9 @@ jobs:
       - name: Contract validator self-test
         run: make check-contracts-selftest
 
+      - name: Check examples
+        run: make check-examples
+
       # The evaluation checks were missing from this workflow until C26, so
       # the dataset validator and the metric fixtures had only ever run
       # locally - including C25's published-interval checks and the assertion
