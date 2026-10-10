@@ -23,6 +23,7 @@
             "unauthenticated",
             "unauthorized_task",
             "payload_too_large",
+            "unsupported_media_type",
             "token_budget_exceeded",
             "rate_limited",
             "detector_unavailable",

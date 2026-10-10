@@ -51,6 +51,12 @@ func New(opts Options) (*Server, error) {
 			// sized at C32 against measured behaviour; these are development
 			// defaults that simply must not be unlimited.
 			ReadHeaderTimeout: 5 * time.Second,
+			// Headers are bounded as well as bodies. Go's default is 1 MiB,
+			// which is generous for a request whose largest legitimate header
+			// is a bearer token: 16 KiB is far more than this API needs and
+			// far less than a client can use to make the server hold memory
+			// before any route has been matched.
+			MaxHeaderBytes: 16 << 10,
 		},
 		listener: listener,
 		drain:    opts.Drain,

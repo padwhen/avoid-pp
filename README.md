@@ -151,6 +151,13 @@ scans
 rejections
   ok    caller-supplied policy -> HTTP 400
   ok    unknown task id -> HTTP 422
+request validation
+  ok    duplicate keys -> HTTP 400
+  ok    wrong type for text -> HTTP 422
+  ok    a lone surrogate escape -> HTTP 400
+  ok    nested too deeply -> HTTP 400
+  ok    text/plain body -> HTTP 415
+  ok    oversized body -> HTTP 413
 authentication
   ok    no credential -> HTTP 401
   ok    unknown key -> HTTP 401
@@ -301,6 +308,46 @@ Keys are generated, replaced and revoked through configuration; a caller may
 hold two keys at once so a replacement needs no downtime. See
 [docs/configuration.md](docs/configuration.md) for the format and
 [C19 acceptance criteria](docs/c19-auth.md) for the reasoning.
+
+## Validating requests
+
+A bad request is refused before the detector is called, so it costs no
+provider work. The centrepiece is the duplicate key:
+
+```json
+{"task_id":"translate_fi_en_v1",
+ "content":{"id":"p","source_type":"translation_input","text":"harmless"},
+ "task_id":"translate_fi_en_v1",
+ "content":{"id":"p","source_type":"translation_input","text":"ATTACK"}}
+```
+
+Go keeps the last occurrence of a repeated key and reports no error, so this
+used to be accepted and `ATTACK` was what got scanned. Anything in the path
+that kept the first occurrence instead — many parsers, and most log pipelines
+— recorded `harmless`. The text that gets scanned and the text that gets
+audited were different strings, with nothing reporting a problem.
+
+RFC 8259 only says names "SHOULD be unique", so there is no correct
+interpretation to pick. The request is refused instead, at every depth.
+
+This cannot live in the JSON Schema: a validator never sees the duplication,
+because the parser collapses it to one key first. So the schema layer's
+inability to express it is asserted explicitly in `contracts/validate.py`,
+with the fixture in `contracts/fixtures/ambiguous`.
+
+Invalid UTF-8 is rejected rather than repaired, which takes two checks rather
+than one. Raw malformed bytes get substituted with U+FFFD before any
+post-decode check can see them, and a lone surrogate escape like `\ud800` is
+all-ASCII so a raw byte check passes while the decoded text still changes. The
+invariant is therefore not "is the text valid" but whether decoding introduced
+a character the caller did not send — counting the ones they may have sent
+deliberately.
+
+Limits: 16 KiB of headers, 64 KiB of body, 32,768 characters of passage, 32
+levels of nesting. The smallest binds first, and the boundary tests say which
+one fired.
+
+See [C20 acceptance criteria](docs/c20-request-validation.md).
 
 ## Running the detector
 

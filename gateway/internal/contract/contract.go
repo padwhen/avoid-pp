@@ -103,6 +103,7 @@ const (
 	ErrCodeUnauthenticated     ErrorCode = "unauthenticated"
 	ErrCodeUnauthorizedTask    ErrorCode = "unauthorized_task"
 	ErrCodePayloadTooLarge     ErrorCode = "payload_too_large"
+	ErrCodeUnsupportedMedia    ErrorCode = "unsupported_media_type"
 	ErrCodeDetectorUnavailable ErrorCode = "detector_unavailable"
 	ErrCodeDeadlineExceeded    ErrorCode = "deadline_exceeded"
 	ErrCodeInternalError       ErrorCode = "internal_error"

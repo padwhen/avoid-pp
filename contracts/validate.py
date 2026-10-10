@@ -6,7 +6,9 @@ script enforces the invariants JSON Schema cannot express on its own:
 
   * a completed scan reports scanned bytes equal to original bytes;
   * an error envelope never validates as a scan response;
-  * the Finnish/Dutch passage survives a parse unchanged, byte for byte.
+  * the Finnish/Dutch passage survives a parse unchanged, byte for byte;
+  * duplicate object keys are outside what any schema can reject, so the
+    limitation itself is asserted rather than assumed.
 
 Run with `make check-contracts`. No network access, no provider key.
 """
@@ -127,6 +129,55 @@ def check_text_preservation(failures: list[str]) -> None:
             failures.append(f"valid/{fixture.name}: Finnish spans missing")
 
 
+def check_duplicate_keys_escape_the_schema(schemas, registry, failures: list[str]) -> None:
+    """Assert that key uniqueness is a parser concern, not a schema one.
+
+    A document repeating `task_id` is valid JSON. Both Python and Go keep the
+    last occurrence and report nothing, so the duplication is gone before a
+    validator runs - there is no keyword in JSON Schema that could catch it,
+    because the schema is handed a dict that has already lost the evidence.
+
+    This check pins the limitation from both sides: the schema must accept
+    such a document, and a duplicate-detecting parser must reject it. Writing
+    it down here means the parser-level guard in gateway/internal/jsonstrict
+    has a stated reason to exist, and that if JSON Schema ever gains key
+    uniqueness this check fails loudly instead of quietly staying true.
+    """
+
+    def reject_duplicates(pairs):
+        seen = set()
+        for key, _ in pairs:
+            if key in seen:
+                raise ValueError(f"duplicate key {key!r}")
+            seen.add(key)
+        return dict(pairs)
+
+    directory = FIXTURE_DIR / "ambiguous"
+    for fixture in sorted(directory.glob("*.json")):
+        raw = fixture.read_text(encoding="utf-8")
+        rel = f"ambiguous/{fixture.name}"
+
+        # A duplicate-detecting parser must refuse it.
+        try:
+            json.loads(raw, object_pairs_hook=reject_duplicates)
+        except ValueError:
+            pass
+        else:
+            failures.append(f"{rel}: expected duplicate keys, found none")
+            continue
+
+        # And the schema must accept it, which is the uncomfortable half.
+        schema_name = schema_name_for(fixture)
+        if schema_name not in schemas:
+            failures.append(f"{rel}: no schema named {schema_name}")
+            continue
+        if not validator_for(schema_name, schemas, registry).is_valid(json.loads(raw)):
+            failures.append(
+                f"{rel}: the schema rejected it; JSON Schema may now express "
+                f"key uniqueness, so the parser-level guard should be revisited"
+            )
+
+
 def main() -> int:
     registry, schemas = load_registry()
     failures: list[str] = []
@@ -135,6 +186,7 @@ def main() -> int:
     check_byte_coverage(failures)
     check_errors_are_not_scans(schemas, registry, failures)
     check_text_preservation(failures)
+    check_duplicate_keys_escape_the_schema(schemas, registry, failures)
 
     if failures:
         print(f"contracts: {len(failures)} failure(s)", file=sys.stderr)
