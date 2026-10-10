@@ -1,0 +1,864 @@
+{
+  "description": "What a correct client does with each wire shape, as data both SDKs read.",
+  "why": [
+    "Two independently written test suites that happen to agree are not a cross-language contract test; they are two opinions. This table is the single statement of required client behaviour, and the Python and Go suites are two implementations of the same assertions against it.",
+    "A disagreement between the clients therefore fails a test rather than being discovered by whichever caller hits it first.",
+    "Every case whose body is a file points at contracts/fixtures/, which the schema validator already checks. So each case says two things at once: what the normative schema makes of the body, and what a client that does not run a JSON Schema validator at runtime makes of it. Those are not always the same answer, and the differences are the interesting part."
+  ],
+  "harness": {
+    "request_text": "Unless a case supplies one, the harness sends a passage of exactly coverage.original_utf8_bytes ASCII characters, so the client's byte cross-check participates in every case rather than being skipped.",
+    "default_request_text": "Hei. Tama on tavallinen suomenkielinen virke.",
+    "outcomes": {
+      "verdict": "The client returned a usable decision. `action`, `label` and `reason_code` must match exactly.",
+      "error": "The client reported a server-side failure carrying the contract's error code. `code` is the code the client surfaces; `unknown` means the body carried a code this contract version does not define, or carried none at all. `retries` is whether this client would retry the call.",
+      "rejected": "The response arrived with HTTP 200 and the client refused to derive a decision from it. `reason` is the client's reason slug."
+    }
+  },
+  "cases": [
+    {
+      "name": "clean allow",
+      "fixture": "valid/scan-response.allow.json",
+      "status": 200,
+      "expect": {
+        "outcome": "verdict",
+        "action": "allow",
+        "label": "no_injection_detected",
+        "reason_code": "clean_complete_scan"
+      }
+    },
+    {
+      "name": "a quoted command is still an allow",
+      "note": "The case this project exists to get right: translating an instruction is not obeying it.",
+      "fixture": "valid/scan-response.allow-quoted-command.json",
+      "status": 200,
+      "expect": {
+        "outcome": "verdict",
+        "action": "allow",
+        "label": "no_injection_detected",
+        "reason_code": "clean_complete_scan"
+      }
+    },
+    {
+      "name": "suspicious, enforced",
+      "fixture": "valid/scan-response.block-suspicious-enforced.json",
+      "status": 200,
+      "expect": {
+        "outcome": "verdict",
+        "action": "block",
+        "label": "suspicious",
+        "reason_code": "suspicious_enforced"
+      }
+    },
+    {
+      "name": "suspicious, monitoring",
+      "note": "A flag is not an allow and not a block. A client that collapsed the three into a boolean would lose the only mode this service can run in before its gates are met.",
+      "fixture": "valid/scan-response.flag-suspicious-monitoring.json",
+      "status": 200,
+      "expect": {
+        "outcome": "verdict",
+        "action": "flag",
+        "label": "suspicious",
+        "reason_code": "suspicious_monitoring"
+      }
+    },
+    {
+      "name": "uncertain, monitoring",
+      "fixture": "valid/scan-response.flag-uncertain-monitoring.json",
+      "status": 200,
+      "expect": {
+        "outcome": "verdict",
+        "action": "flag",
+        "label": "uncertain",
+        "reason_code": "uncertain_monitoring"
+      }
+    },
+    {
+      "name": "an action from a later contract version",
+      "note": "The one place the contract tells clients what to do with data they cannot understand: common.schema.json says any unrecognised action MUST be treated as block. So this is not an error and not a rejection - it is a block, with the original string retained so telemetry can show why.",
+      "fixture": "invalid/scan-response.future-action.json",
+      "status": 200,
+      "expect": {
+        "outcome": "verdict",
+        "action": "block",
+        "label": "suspicious",
+        "reason_code": "suspicious_enforced",
+        "unrecognised_action": "verify"
+      }
+    },
+    {
+      "name": "suspicious but allowed",
+      "note": "The central failure this service exists to prevent, arriving as a well-formed 200. Rejected rather than honoured: this is the only inconsistency direction that would make the client permissive.",
+      "fixture": "invalid/scan-response.suspicious-but-allow.json",
+      "status": 200,
+      "expect": {
+        "outcome": "rejected",
+        "reason": "allow_contradicts_label"
+      }
+    },
+    {
+      "name": "uncertain but allowed",
+      "fixture": "invalid/scan-response.uncertain-but-allow.json",
+      "status": 200,
+      "expect": {
+        "outcome": "rejected",
+        "reason": "allow_contradicts_label"
+      }
+    },
+    {
+      "name": "complete but truncated",
+      "note": "A scan of part of a passage is not a verdict about the passage.",
+      "fixture": "invalid/scan-response.complete-but-truncated.json",
+      "status": 200,
+      "expect": {
+        "outcome": "rejected",
+        "reason": "coverage_truncated"
+      }
+    },
+    {
+      "name": "a status this contract version does not define",
+      "fixture": "invalid/scan-response.unavailable-status.json",
+      "status": 200,
+      "expect": {
+        "outcome": "rejected",
+        "reason": "scan_not_complete"
+      }
+    },
+    {
+      "name": "an invented confidence number",
+      "note": "The schema rejects this body; a client that does not run the schema at runtime accepts the verdict and ignores the extra field. That is deliberate - unknown response fields are forward compatibility, not smuggling, because the client is the only reader. What matters is that the number cannot reach an application: the verdict type has no field for it, so a server that starts inventing calibration cannot publish it through this client.",
+      "fixture": "invalid/scan-response.invented-confidence.json",
+      "status": 200,
+      "expect": {
+        "outcome": "verdict",
+        "action": "allow",
+        "label": "no_injection_detected",
+        "reason_code": "clean_complete_scan",
+        "no_field_named": "confidence"
+      }
+    },
+    {
+      "name": "allow with a reason code that is not the clean one",
+      "note": "Again only the permissive direction. A block carrying clean_complete_scan is a server being stricter than its own schema, and the client obeys it; an allow that does not claim a clean scan is refused.",
+      "status": 200,
+      "body": {
+        "request_id": "req-inline-1",
+        "scan_status": "complete",
+        "assessment": {
+          "label": "no_injection_detected",
+          "categories": [],
+          "evidence": []
+        },
+        "decision": {
+          "action": "allow",
+          "reason_code": "suspicious_monitoring"
+        },
+        "coverage": {
+          "original_utf8_bytes": 45,
+          "scanned_utf8_bytes": 45,
+          "truncated": false
+        },
+        "versions": {
+          "contract": "1.0.0",
+          "detector": "fake-0",
+          "prompt": "none",
+          "policy": "monitoring-1"
+        }
+      },
+      "expect": {
+        "outcome": "rejected",
+        "reason": "allow_without_clean_reason"
+      }
+    },
+    {
+      "name": "a block that claims a clean scan",
+      "note": "The mirror image of the case above, and honoured rather than rejected. A server refusing something its schema would have allowed is not a safety problem, and second-guessing it would be the client overriding a server-side decision.",
+      "status": 200,
+      "body": {
+        "request_id": "req-inline-2",
+        "scan_status": "complete",
+        "assessment": {
+          "label": "no_injection_detected",
+          "categories": [],
+          "evidence": []
+        },
+        "decision": {
+          "action": "block",
+          "reason_code": "clean_complete_scan"
+        },
+        "coverage": {
+          "original_utf8_bytes": 45,
+          "scanned_utf8_bytes": 45,
+          "truncated": false
+        },
+        "versions": {
+          "contract": "1.0.0",
+          "detector": "fake-0",
+          "prompt": "none",
+          "policy": "monitoring-1"
+        }
+      },
+      "expect": {
+        "outcome": "verdict",
+        "action": "block",
+        "label": "no_injection_detected",
+        "reason_code": "clean_complete_scan"
+      }
+    },
+    {
+      "name": "a label this contract version does not define",
+      "note": "Rejected outright, because the consistency check that keeps a non-clean label from allowing cannot be performed against a label whose meaning is unknown. An unrecognised label is not a fourth kind of clean.",
+      "status": 200,
+      "body": {
+        "request_id": "req-inline-3",
+        "scan_status": "complete",
+        "assessment": {
+          "label": "probably_fine",
+          "categories": [],
+          "evidence": []
+        },
+        "decision": {
+          "action": "allow",
+          "reason_code": "clean_complete_scan"
+        },
+        "coverage": {
+          "original_utf8_bytes": 45,
+          "scanned_utf8_bytes": 45,
+          "truncated": false
+        },
+        "versions": {
+          "contract": "1.0.0",
+          "detector": "fake-0",
+          "prompt": "none",
+          "policy": "monitoring-1"
+        }
+      },
+      "expect": {
+        "outcome": "rejected",
+        "reason": "unknown_label"
+      }
+    },
+    {
+      "name": "no decision at all",
+      "status": 200,
+      "body": {
+        "request_id": "req-inline-4",
+        "scan_status": "complete",
+        "assessment": {
+          "label": "no_injection_detected",
+          "categories": [],
+          "evidence": []
+        },
+        "coverage": {
+          "original_utf8_bytes": 45,
+          "scanned_utf8_bytes": 45,
+          "truncated": false
+        },
+        "versions": {
+          "contract": "1.0.0",
+          "detector": "fake-0",
+          "prompt": "none",
+          "policy": "monitoring-1"
+        }
+      },
+      "expect": {
+        "outcome": "rejected",
+        "reason": "missing_field"
+      }
+    },
+    {
+      "name": "a verdict about a different number of bytes",
+      "note": "The divergence C28 is built around, caught in the client rather than left to each caller. The passage sent is 45 bytes; the response claims 103 were scanned, so whatever this verdict describes, it is not what we sent.",
+      "status": 200,
+      "request_text": "Hei. Tama on tavallinen suomenkielinen virke.",
+      "body": {
+        "request_id": "req-inline-5",
+        "scan_status": "complete",
+        "assessment": {
+          "label": "no_injection_detected",
+          "categories": [],
+          "evidence": []
+        },
+        "decision": {
+          "action": "allow",
+          "reason_code": "clean_complete_scan"
+        },
+        "coverage": {
+          "original_utf8_bytes": 103,
+          "scanned_utf8_bytes": 103,
+          "truncated": false
+        },
+        "versions": {
+          "contract": "1.0.0",
+          "detector": "fake-0",
+          "prompt": "none",
+          "policy": "monitoring-1"
+        }
+      },
+      "expect": {
+        "outcome": "rejected",
+        "reason": "coverage_mismatch"
+      }
+    },
+    {
+      "name": "partial coverage without the truncated flag",
+      "status": 200,
+      "body": {
+        "request_id": "req-inline-6",
+        "scan_status": "complete",
+        "assessment": {
+          "label": "no_injection_detected",
+          "categories": [],
+          "evidence": []
+        },
+        "decision": {
+          "action": "allow",
+          "reason_code": "clean_complete_scan"
+        },
+        "coverage": {
+          "original_utf8_bytes": 45,
+          "scanned_utf8_bytes": 20,
+          "truncated": false
+        },
+        "versions": {
+          "contract": "1.0.0",
+          "detector": "fake-0",
+          "prompt": "none",
+          "policy": "monitoring-1"
+        }
+      },
+      "expect": {
+        "outcome": "rejected",
+        "reason": "coverage_partial"
+      }
+    },
+    {
+      "name": "an error envelope served with HTTP 200",
+      "note": "A gateway bug, or a proxy that rewrote the status. Either way there is no decision here, and the client must not read the missing one as an allow.",
+      "status": 200,
+      "body": {
+        "request_id": "req-inline-7",
+        "error": {
+          "code": "detector_unavailable",
+          "message": "Detector is not available."
+        }
+      },
+      "expect": {
+        "outcome": "rejected",
+        "reason": "missing_field"
+      }
+    },
+    {
+      "name": "HTTP 200 carrying a body that is not JSON",
+      "note": "What a captive portal or an HTML error page from an intermediary looks like.",
+      "status": 200,
+      "raw_body": "<html><body>Gateway timeout</body></html>",
+      "expect": {
+        "outcome": "rejected",
+        "reason": "unreadable_body"
+      }
+    },
+    {
+      "name": "HTTP 200 carrying a JSON array",
+      "status": 200,
+      "raw_body": "[]",
+      "expect": {
+        "outcome": "rejected",
+        "reason": "unreadable_body"
+      }
+    },
+    {
+      "name": "rate limited",
+      "fixture": "valid/error.rate-limited.json",
+      "status": 429,
+      "expect": {
+        "outcome": "error",
+        "code": "rate_limited",
+        "retries": true,
+        "retry_after_seconds": 30
+      }
+    },
+    {
+      "name": "overloaded",
+      "note": "Retried, because an explicit shed means the work definitively did not happen.",
+      "status": 503,
+      "body": {
+        "request_id": "req-inline-8",
+        "error": {
+          "code": "overloaded",
+          "message": "The gateway is at capacity.",
+          "retry_after_seconds": 1
+        }
+      },
+      "expect": {
+        "outcome": "error",
+        "code": "overloaded",
+        "retries": true,
+        "retry_after_seconds": 1
+      }
+    },
+    {
+      "name": "detector unavailable",
+      "note": "NOT retried, which is the one retry decision in these clients worth arguing about. A 503 reads as transient, but detector_unavailable carries no retry guidance in the contract, and a scan is a paid provider call. Retrying a request that may already have reached the model doubles the spend to buy a verdict the caller is about to turn into a block anyway. So the client retries only when the server said the work did not happen.",
+      "fixture": "valid/error.detector-unavailable.json",
+      "status": 503,
+      "expect": {
+        "outcome": "error",
+        "code": "detector_unavailable",
+        "retries": false
+      }
+    },
+    {
+      "name": "deadline exceeded",
+      "note": "Not retried for the same reason, more sharply: a deadline expiring says nothing about whether the provider call completed.",
+      "fixture": "valid/error.deadline-exceeded.json",
+      "status": 504,
+      "expect": {
+        "outcome": "error",
+        "code": "deadline_exceeded",
+        "retries": false
+      }
+    },
+    {
+      "name": "unauthenticated",
+      "fixture": "valid/error.unauthenticated.json",
+      "status": 401,
+      "expect": {
+        "outcome": "error",
+        "code": "unauthenticated",
+        "retries": false
+      }
+    },
+    {
+      "name": "unauthorized for this task",
+      "fixture": "valid/error.unauthorized-task.json",
+      "status": 403,
+      "expect": {
+        "outcome": "error",
+        "code": "unauthorized_task",
+        "retries": false
+      }
+    },
+    {
+      "name": "payload too large",
+      "fixture": "valid/error.payload-too-large.json",
+      "status": 413,
+      "expect": {
+        "outcome": "error",
+        "code": "payload_too_large",
+        "retries": false
+      }
+    },
+    {
+      "name": "unsupported media type",
+      "fixture": "valid/error.unsupported-media-type.json",
+      "status": 415,
+      "expect": {
+        "outcome": "error",
+        "code": "unsupported_media_type",
+        "retries": false
+      }
+    },
+    {
+      "name": "schema invalid",
+      "fixture": "valid/error.schema-invalid.json",
+      "status": 422,
+      "expect": {
+        "outcome": "error",
+        "code": "schema_invalid",
+        "retries": false
+      }
+    },
+    {
+      "name": "unknown task id",
+      "fixture": "valid/error.unknown-task-id.json",
+      "status": 422,
+      "expect": {
+        "outcome": "error",
+        "code": "unknown_task_id",
+        "retries": false
+      }
+    },
+    {
+      "name": "malformed json",
+      "status": 400,
+      "body": {
+        "request_id": "req-inline-9",
+        "error": {
+          "code": "malformed_json",
+          "message": "Request body is not valid JSON."
+        }
+      },
+      "expect": {
+        "outcome": "error",
+        "code": "malformed_json",
+        "retries": false
+      }
+    },
+    {
+      "name": "token budget exceeded",
+      "note": "Defined by error.schema.json and documented at 422 in openapi.yaml, and the gateway has no constant for it, so it cannot currently be emitted. The clients handle it anyway: a code the contract permits is not a code a client may meet with a crash.",
+      "status": 422,
+      "body": {
+        "request_id": "req-inline-10",
+        "error": {
+          "code": "token_budget_exceeded",
+          "message": "Passage exceeds the token budget."
+        }
+      },
+      "expect": {
+        "outcome": "error",
+        "code": "token_budget_exceeded",
+        "retries": false
+      }
+    },
+    {
+      "name": "internal error",
+      "status": 500,
+      "body": {
+        "request_id": "req-inline-11",
+        "error": {
+          "code": "internal_error",
+          "message": "Scan failed."
+        }
+      },
+      "expect": {
+        "outcome": "error",
+        "code": "internal_error",
+        "retries": false
+      }
+    },
+    {
+      "name": "an error envelope carrying an assessment",
+      "note": "The schema forbids it so no failure path can present itself as a clean scan. The client is the second line of that: it reads the code and has nowhere to put an assessment, so a gateway that regressed could not hand one to an application through this client.",
+      "fixture": "invalid/error.carries-assessment.json",
+      "status": 503,
+      "expect": {
+        "outcome": "error",
+        "code": "detector_unavailable",
+        "retries": false,
+        "no_field_named": "assessment"
+      }
+    },
+    {
+      "name": "an error code this contract version does not define",
+      "fixture": "invalid/error.unknown-code.json",
+      "status": 500,
+      "expect": {
+        "outcome": "error",
+        "code": "unknown",
+        "retries": false
+      }
+    },
+    {
+      "name": "a failure with no body at all",
+      "status": 503,
+      "raw_body": "",
+      "expect": {
+        "outcome": "error",
+        "code": "unknown",
+        "retries": false
+      }
+    },
+    {
+      "name": "a failure whose body is HTML from an intermediary",
+      "note": "Nothing here is the gateway's. The status is all the client can trust, and it still must not become an allow.",
+      "status": 502,
+      "raw_body": "<html><head><title>502 Bad Gateway</title></head></html>",
+      "expect": {
+        "outcome": "error",
+        "code": "unknown",
+        "retries": false
+      }
+    },
+    {
+      "name": "HTTP 429 with no readable body",
+      "note": "Retried on the status alone. A 429 is unambiguous about the request not having been served, whoever generated it.",
+      "status": 429,
+      "raw_body": "",
+      "expect": {
+        "outcome": "error",
+        "code": "unknown",
+        "retries": true
+      }
+    },
+    {
+      "name": "a success status that is not 200",
+      "note": "There is one success shape in this contract. A 204 has no body to read and a 201 is not a shape the schema describes, so neither may be optimistically treated as a scan.",
+      "status": 204,
+      "raw_body": "",
+      "expect": {
+        "outcome": "error",
+        "code": "unknown",
+        "retries": false
+      }
+    },
+    {
+      "name": "a redirect",
+      "note": "Followed by neither client. A redirect on an authenticated POST invites sending the credential to wherever the Location header points.",
+      "status": 302,
+      "raw_body": "",
+      "headers": {
+        "Location": "https://elsewhere.example/v1/scans"
+      },
+      "expect": {
+        "outcome": "error",
+        "code": "unknown",
+        "retries": false
+      }
+    },
+    {
+      "name": "an action that is a number, not a string",
+      "note": "The group of cases below exists because the two clients disagreed. Go unmarshals into a struct, so a wrong-typed field fails the whole body and the most specific thing it can say is that the body is unreadable. Python would have coerced some of these and carried on. The rule both now follow: absent is a missing field, wrong JSON type is an unreadable body, and only a right-typed unrecognised value gets a specific answer. mypy --strict is what surfaced it, and this table is what pins it.",
+      "status": 200,
+      "body": {
+        "request_id": "req-typed",
+        "scan_status": "complete",
+        "assessment": {
+          "label": "no_injection_detected",
+          "categories": [],
+          "evidence": []
+        },
+        "decision": {
+          "action": 7,
+          "reason_code": "clean_complete_scan"
+        },
+        "coverage": {
+          "original_utf8_bytes": 45,
+          "scanned_utf8_bytes": 45,
+          "truncated": false
+        },
+        "versions": {
+          "contract": "1.0.0",
+          "detector": "fake-0",
+          "prompt": "none",
+          "policy": "monitoring-1"
+        }
+      },
+      "expect": {
+        "outcome": "rejected",
+        "reason": "unreadable_body"
+      }
+    },
+    {
+      "name": "a label that is a number",
+      "status": 200,
+      "body": {
+        "request_id": "req-typed",
+        "scan_status": "complete",
+        "assessment": {
+          "label": 1,
+          "categories": [],
+          "evidence": []
+        },
+        "decision": {
+          "action": "allow",
+          "reason_code": "clean_complete_scan"
+        },
+        "coverage": {
+          "original_utf8_bytes": 45,
+          "scanned_utf8_bytes": 45,
+          "truncated": false
+        },
+        "versions": {
+          "contract": "1.0.0",
+          "detector": "fake-0",
+          "prompt": "none",
+          "policy": "monitoring-1"
+        }
+      },
+      "expect": {
+        "outcome": "rejected",
+        "reason": "unreadable_body"
+      }
+    },
+    {
+      "name": "a byte count sent as a string",
+      "note": "Python's int(\"45\") would have accepted this happily, and the verdict would then have been built on a number the gateway never sent as one.",
+      "status": 200,
+      "body": {
+        "request_id": "req-typed",
+        "scan_status": "complete",
+        "assessment": {
+          "label": "no_injection_detected",
+          "categories": [],
+          "evidence": []
+        },
+        "decision": {
+          "action": "allow",
+          "reason_code": "clean_complete_scan"
+        },
+        "coverage": {
+          "original_utf8_bytes": "45",
+          "scanned_utf8_bytes": 45,
+          "truncated": false
+        },
+        "versions": {
+          "contract": "1.0.0",
+          "detector": "fake-0",
+          "prompt": "none",
+          "policy": "monitoring-1"
+        }
+      },
+      "expect": {
+        "outcome": "rejected",
+        "reason": "unreadable_body"
+      }
+    },
+    {
+      "name": "truncated sent as a string",
+      "note": "\"false\" is a true-ish string in more languages than it is not.",
+      "status": 200,
+      "body": {
+        "request_id": "req-typed",
+        "scan_status": "complete",
+        "assessment": {
+          "label": "no_injection_detected",
+          "categories": [],
+          "evidence": []
+        },
+        "decision": {
+          "action": "allow",
+          "reason_code": "clean_complete_scan"
+        },
+        "coverage": {
+          "original_utf8_bytes": 45,
+          "scanned_utf8_bytes": 45,
+          "truncated": "false"
+        },
+        "versions": {
+          "contract": "1.0.0",
+          "detector": "fake-0",
+          "prompt": "none",
+          "policy": "monitoring-1"
+        }
+      },
+      "expect": {
+        "outcome": "rejected",
+        "reason": "unreadable_body"
+      }
+    },
+    {
+      "name": "an assessment with no label at all",
+      "note": "Absent rather than unrecognised, so it is a missing field. The distinction is not cosmetic: a missing label means the response is incomplete, and an unrecognised one means the contract moved.",
+      "status": 200,
+      "body": {
+        "request_id": "req-typed",
+        "scan_status": "complete",
+        "assessment": {
+          "categories": [],
+          "evidence": []
+        },
+        "decision": {
+          "action": "allow",
+          "reason_code": "clean_complete_scan"
+        },
+        "coverage": {
+          "original_utf8_bytes": 45,
+          "scanned_utf8_bytes": 45,
+          "truncated": false
+        },
+        "versions": {
+          "contract": "1.0.0",
+          "detector": "fake-0",
+          "prompt": "none",
+          "policy": "monitoring-1"
+        }
+      },
+      "expect": {
+        "outcome": "rejected",
+        "reason": "missing_field"
+      }
+    },
+    {
+      "name": "coverage that does not say whether it was truncated",
+      "note": "Not read as false. \"We do not know whether this was truncated\" and \"it was not truncated\" are different claims, and only one of them is safe to act on.",
+      "status": 200,
+      "body": {
+        "request_id": "req-typed",
+        "scan_status": "complete",
+        "assessment": {
+          "label": "no_injection_detected",
+          "categories": [],
+          "evidence": []
+        },
+        "decision": {
+          "action": "allow",
+          "reason_code": "clean_complete_scan"
+        },
+        "coverage": {
+          "original_utf8_bytes": 45,
+          "scanned_utf8_bytes": 45
+        },
+        "versions": {
+          "contract": "1.0.0",
+          "detector": "fake-0",
+          "prompt": "none",
+          "policy": "monitoring-1"
+        }
+      },
+      "expect": {
+        "outcome": "rejected",
+        "reason": "missing_field"
+      }
+    },
+    {
+      "name": "a versions block that is a string",
+      "status": 200,
+      "body": {
+        "request_id": "req-typed",
+        "scan_status": "complete",
+        "assessment": {
+          "label": "no_injection_detected",
+          "categories": [],
+          "evidence": []
+        },
+        "decision": {
+          "action": "allow",
+          "reason_code": "clean_complete_scan"
+        },
+        "coverage": {
+          "original_utf8_bytes": 45,
+          "scanned_utf8_bytes": 45,
+          "truncated": false
+        },
+        "versions": "1.0.0"
+      },
+      "expect": {
+        "outcome": "rejected",
+        "reason": "unreadable_body"
+      }
+    },
+    {
+      "name": "categories sent as a string",
+      "status": 200,
+      "body": {
+        "request_id": "req-typed",
+        "scan_status": "complete",
+        "assessment": {
+          "label": "no_injection_detected",
+          "categories": "task_redirection",
+          "evidence": []
+        },
+        "decision": {
+          "action": "allow",
+          "reason_code": "clean_complete_scan"
+        },
+        "coverage": {
+          "original_utf8_bytes": 45,
+          "scanned_utf8_bytes": 45,
+          "truncated": false
+        },
+        "versions": {
+          "contract": "1.0.0",
+          "detector": "fake-0",
+          "prompt": "none",
+          "policy": "monitoring-1"
+        }
+      },
+      "expect": {
+        "outcome": "rejected",
+        "reason": "unreadable_body"
+      }
+    }
+  ]
+}

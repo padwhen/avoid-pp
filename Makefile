@@ -23,7 +23,7 @@ DETECTOR_HOST ?= 127.0.0.1
 DETECTOR_PORT ?= 9000
 
 .DEFAULT_GOAL := help
-.PHONY: demo check-examples live-translate splits splits-freeze duplicates audit check-splits check-duplicates ingest help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner dev-key run-gateway run-detector up down logs smoke live-smoke live-eval
+.PHONY: check-sdk check-sdk-go check-sdk-python demo check-examples live-translate splits splits-freeze duplicates audit check-splits check-duplicates ingest help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner dev-key run-gateway run-detector up down logs smoke live-smoke live-eval
 
 help:
 	@printf '%s\n' \
@@ -33,6 +33,7 @@ help:
 	  'make check-python Check Python formatting, lint, types, tests and package import' \
 	  'make check-contracts  Validate contract schemas against positive/negative fixtures' \
 	  'make check-contracts-selftest  Prove the contract validator rejects bad data' \
+	  'make check-sdk        Test both SDK clients against the shared expectations table' \
 	  'make check-evals      Validate the Finnish seed dataset and report progress' \
 	  'make check-examples   Test the protected-translator example' \
 	  'make live-translate   Translate one Finnish passage live (COSTS MONEY)' \
@@ -61,11 +62,12 @@ bootstrap: bootstrap-go bootstrap-python
 
 bootstrap-go:
 	cd gateway && $(GO) mod download
+	cd sdk/go && $(GO) mod download
 
 bootstrap-python:
 	cd detector && $(UV) sync --locked
 
-check: check-go check-python check-contracts check-contracts-selftest check-examples check-evals check-evals-runner check-splits check-duplicates check-spend-guards
+check: check-go check-python check-contracts check-contracts-selftest check-sdk check-examples check-evals check-evals-runner check-splits check-duplicates check-spend-guards
 
 check-go:
 	@files="$$(cd gateway && $(GOFMT) -l .)" || exit $$?; \
@@ -74,6 +76,25 @@ check-go:
 	fi
 	cd gateway && $(GO) vet ./...
 	cd gateway && $(GO) test -race ./...
+
+# The SDK is a separate Go module, so `./...` in gateway/ does not see it. A
+# check that did not name it would report green on code it never compiled.
+check-sdk: check-sdk-go check-sdk-python
+
+check-sdk-go:
+	@files="$$(cd sdk/go && $(GOFMT) -l .)" || exit $$?; \
+	if [ -n "$$files" ]; then \
+	  printf 'Run gofmt on these files:\n%s\n' "$$files"; exit 1; \
+	fi
+	cd sdk/go && $(GO) vet ./...
+	cd sdk/go && $(GO) test -race ./...
+
+check-sdk-python:
+	$(UV) run --project detector --locked --no-sync ruff format --check sdk/python
+	$(UV) run --project detector --locked --no-sync ruff check sdk/python
+	$(UV) run --project detector --locked --no-sync mypy --strict sdk/python/avoidpp
+	PYTHONPATH=sdk/python $(UV) run --project detector --locked --no-sync \
+	  python -m pytest sdk/python/tests -q
 
 check-python:
 	cd detector && $(UV) run --locked --no-sync ruff format --check . ../evals ../scripts
@@ -121,7 +142,7 @@ check-duplicates:
 	$(UV) run --project detector --locked --no-sync python evals/duplicates.py
 
 check-examples:
-	PYTHONPATH=. $(UV) run --project detector --locked --no-sync python -m pytest examples/tests -q
+	PYTHONPATH=.:sdk/python $(UV) run --project detector --locked --no-sync python -m pytest examples/tests -q
 
 # Costs money. Never run by CI or by `make check`.
 live-translate:
