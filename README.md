@@ -5,7 +5,7 @@
 A Go/Python workspace for a prompt-injection detection API, initially evaluated
 around Finnish-to-English LLM translation.
 
-**Status: C14 — a real detector with a versioned prompt, behind an opt-in switch.** `make up` starts
+**Status: C15 — a real detector with a versioned prompt and validated output, behind an opt-in switch.** `make up` starts
 both services in containers and the scan endpoint returns an assessment and a
 decision under a configured policy. The detector defaults to a keyword fake
 with no provider calls; live Claude detection is opt-in and costs money per
@@ -208,6 +208,14 @@ evaluation report names a version and carries its SHA-256, and every measured
 version's hash is pinned in the test suite — editing a prompt in place fails
 the build rather than silently invalidating a recorded number. See
 [C14 acceptance criteria](docs/c14-prompt.md).
+
+Model replies are validated before they become assessments. Structured outputs
+guarantee a reply is schema-valid; they guarantee nothing about whether it is
+true. Every quotation must occur verbatim in the passage it cites, and a
+suspicious verdict whose quotations were all invented is rejected outright. A
+wrong-but-valid classification deliberately passes — rejecting it would hide a
+quality problem behind an availability error. See
+[C15 acceptance criteria](docs/c15-output-validation.md).
 
 ## Policy
 

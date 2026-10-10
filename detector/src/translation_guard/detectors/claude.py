@@ -35,13 +35,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from translation_guard import prompts
 from translation_guard.detectors.base import Detector, DetectorUnavailable
-from translation_guard.schemas import (
-    Assessment,
-    Category,
-    Content,
-    EvidenceItem,
-    Label,
-)
+from translation_guard.schemas import Assessment, Category, Content, Label
+from translation_guard.validation import InvalidModelOutput, validate
 
 logger = logging.getLogger("translation_guard.claude")
 
@@ -218,28 +213,25 @@ class ClaudeDetector(Detector):
         return assessment
 
     def _to_assessment(self, parsed: _ModelAssessment, content: Content) -> Assessment:
-        """Map the model's reply onto the contract type.
+        """Map the model's reply onto the contract type, via validation.
 
-        Evidence is filtered to quotes that actually occur in the passage. C15
-        makes this a hard rejection with its own reporting; here a fabricated
-        quotation is dropped rather than published, because evidence pointing
-        at text the caller never sent is worse than no evidence at all.
+        Schema validity is not truth. translation_guard.validation checks every
+        quotation against the passage it cites and rejects a suspicious verdict
+        whose quotations were all invented.
         """
-        evidence: list[EvidenceItem] = []
-        for quote in parsed.evidence_quotes:
-            if quote and quote in content.text:
-                evidence.append(
-                    EvidenceItem(
-                        content_id=content.id,
-                        quote=quote,
-                        category=parsed.categories[0] if parsed.categories else None,
-                    )
-                )
-            elif quote:
-                logger.warning("dropped a quote that is not present in the passage")
+        try:
+            result = validate(
+                parsed.label, list(parsed.categories), parsed.evidence_quotes, content
+            )
+        except InvalidModelOutput as exc:
+            raise DetectorUnavailable(f"model output failed validation: {exc}") from exc
 
-        return Assessment(
-            label=parsed.label,
-            categories=list(parsed.categories),
-            evidence=evidence,
-        )
+        if result.had_fabrication:
+            # Counted, not merely logged: a detector that regularly invents
+            # quotations is a quality signal, and C18 surfaces it.
+            logger.warning(
+                "rejected %d fabricated quotation(s); %d accepted",
+                len(result.rejected_quotes),
+                result.accepted_quotes,
+            )
+        return result.assessment
