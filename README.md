@@ -5,7 +5,7 @@
 A Go/Python workspace for a prompt-injection detection API, initially evaluated
 around Finnish-to-English LLM translation.
 
-**Status: C16 — a real detector with a versioned prompt, validated output and bounded input, behind an opt-in switch.** `make up` starts
+**Status: C17 — a real detector with a versioned prompt, validated output, bounded input and bounded retries, behind an opt-in switch.** `make up` starts
 both services in containers and the scan endpoint returns an assessment and a
 decision under a configured policy. The detector defaults to a keyword fake
 with no provider calls; live Claude detection is opt-in and costs money per
@@ -223,6 +223,13 @@ rather than trimmed. The token estimate is measured, not assumed: Finnish runs
 what English intuition suggests, so 32 KiB of Finnish is about 21,500 tokens
 and the token budget binds long before the byte ceiling. See
 [C16 acceptance criteria](docs/c16-input-limits.md).
+
+Retrying happens in exactly one layer. The gateway does not retry and the
+provider SDK is constructed with zero retries, so the worst case is three
+provider requests per scan rather than the nine that three reasonable-looking
+layers would silently produce. Every attempt shares one absolute deadline
+rather than getting a fresh clock. See
+[C17 acceptance criteria](docs/c17-retries-and-deadlines.md).
 
 ## Policy
 

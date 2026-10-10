@@ -33,7 +33,7 @@ from typing import Annotated, Any
 import anthropic
 from pydantic import BaseModel, ConfigDict, Field
 
-from translation_guard import prompts
+from translation_guard import prompts, retry
 from translation_guard.detectors.base import Detector, DetectorUnavailable
 from translation_guard.limits import Budget, InputTooLarge
 from translation_guard.limits import check as check_limits
@@ -90,8 +90,12 @@ class ClaudeDetector(Detector):
         on_usage: Callable[[int, int], None] | None = None,
         prompt_version: str = DEFAULT_PROMPT_VERSION,
         budget: Budget | None = None,
+        retry_policy: retry.RetryPolicy | None = None,
     ) -> None:
         self._budget = budget or Budget()
+        self._retry = retry_policy or retry.RetryPolicy(
+            max_attempts=3, total_deadline_seconds=timeout_seconds
+        )
         self._api_key = api_key
         self._model = model
         self._identity = identity
@@ -156,46 +160,68 @@ class ClaudeDetector(Detector):
             request_timeout = min(self._timeout, max(deadline_ms / 1000.0, 0.1))
 
         started = time.monotonic()
+
+        async def attempt(remaining: float) -> Any:
+            """One provider call, bounded by what is left of the budget."""
+            assert self._client is not None
+            try:
+                return await self._client.messages.parse(
+                    model=self._model,
+                    max_tokens=self._max_tokens,
+                    system=self._prompt.system,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": self._prompt.render_user(
+                                content_id=content.id,
+                                language_hint=content.language_hint or "unspecified",
+                                text=content.text,
+                            ),
+                        }
+                    ],
+                    output_format=_ModelAssessment,
+                    timeout=min(request_timeout, remaining),
+                )
+            # Transient: the same request may succeed shortly.
+            except anthropic.APITimeoutError as exc:
+                raise retry.RetryableError("provider timed out") from exc
+            except anthropic.RateLimitError as exc:
+                raise retry.RetryableError("provider rate limited the request") from exc
+            except anthropic.APIConnectionError as exc:
+                raise retry.RetryableError("could not reach the provider") from exc
+            # Permanent: retrying cannot change the answer, only the latency.
+            except anthropic.AuthenticationError as exc:
+                raise retry.PermanentError("provider rejected the credentials") from exc
+            except anthropic.APIStatusError as exc:
+                status = exc.status_code
+                if status >= 500:
+                    raise retry.RetryableError(f"provider returned {status}") from exc
+                raise retry.PermanentError(f"provider returned {status}") from exc
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                # A schema violation will recur on an identical request.
+                raise retry.PermanentError(
+                    f"provider reply could not be processed ({type(exc).__name__})"
+                ) from exc
+
         try:
-            response = await self._client.messages.parse(
-                model=self._model,
-                max_tokens=self._max_tokens,
-                system=self._prompt.system,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": self._prompt.render_user(
-                            content_id=content.id,
-                            language_hint=content.language_hint or "unspecified",
-                            text=content.text,
-                        ),
-                    }
-                ],
-                output_format=_ModelAssessment,
-                timeout=request_timeout,
+            response = await retry.run(
+                attempt,
+                retry.RetryPolicy(
+                    max_attempts=self._retry.max_attempts,
+                    total_deadline_seconds=min(
+                        self._retry.total_deadline_seconds, request_timeout
+                    ),
+                    initial_backoff_seconds=self._retry.initial_backoff_seconds,
+                    max_backoff_seconds=self._retry.max_backoff_seconds,
+                    jitter=self._retry.jitter,
+                ),
             )
-        except anthropic.APITimeoutError as exc:
-            raise DetectorUnavailable("provider timed out") from exc
-        except anthropic.AuthenticationError as exc:
-            raise DetectorUnavailable("provider rejected the credentials") from exc
-        except anthropic.RateLimitError as exc:
-            raise DetectorUnavailable("provider rate limited the request") from exc
-        except anthropic.APIConnectionError as exc:
-            raise DetectorUnavailable("could not reach the provider") from exc
-        except anthropic.APIStatusError as exc:
-            raise DetectorUnavailable(f"provider returned {exc.status_code}") from exc
-        except asyncio.CancelledError:
-            # Cancellation is the caller withdrawing, not a detector failure.
-            raise
-        except Exception as exc:
-            # Anything else - a schema violation in the reply, a decoding
-            # failure - is still an operational failure. Letting it escape
-            # would crash the request path instead of returning 503, and the
-            # first live run did exactly that.
-            logger.warning("unexpected provider failure: %s", type(exc).__name__)
-            raise DetectorUnavailable(
-                f"provider reply could not be processed ({type(exc).__name__})"
-            ) from exc
+        except retry.DeadlineExceeded as exc:
+            raise DetectorUnavailable(f"scan deadline expired: {exc}") from exc
+        except (retry.RetryableError, retry.PermanentError) as exc:
+            raise DetectorUnavailable(str(exc)) from exc
 
         elapsed_ms = int((time.monotonic() - started) * 1000)
 

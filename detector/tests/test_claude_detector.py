@@ -65,9 +65,20 @@ class StubClient:
         self.closed = True
 
 
-def detector_with(messages: StubMessages) -> ClaudeDetector:
+def detector_with(messages: StubMessages, *, attempts: int = 1) -> ClaudeDetector:
+    """A detector wired to a stub.
+
+    One attempt by default: these tests assert request shape and response
+    mapping, and retry timing has its own fake-clock suite. Leaving the real
+    policy in place would make every failure case sleep through a backoff.
+    """
+    from translation_guard.retry import RetryPolicy
+
     d = ClaudeDetector(
-        api_key="sk-ant-test", model="claude-opus-5", identity="claude:test"
+        api_key="sk-ant-test",
+        model="claude-opus-5",
+        identity="claude:test",
+        retry_policy=RetryPolicy(max_attempts=attempts, total_deadline_seconds=30),
     )
     d._client = StubClient(messages)
     return d
@@ -325,3 +336,31 @@ async def test_accepted_input_is_sent_whole():
     sent = messages.calls[0]["messages"][0]["content"]
     assert FINNISH_DUTCH in sent
     assert sent.count(FINNISH_DUTCH) == 1
+
+
+# C17: a transient provider failure is retried; a permanent one is not.
+async def test_a_transient_failure_is_retried():
+    messages = StubMessages(error=_RateLimit())
+    with pytest.raises(DetectorUnavailable):
+        await detector_with(messages, attempts=3).assess(content())
+    assert len(messages.calls) == 3, "a rate limit should have been retried"
+
+
+async def test_an_authentication_failure_is_not_retried():
+    """Retrying bad credentials cannot succeed; it just spends the budget."""
+    messages = StubMessages(error=_Auth())
+    with pytest.raises(DetectorUnavailable):
+        await detector_with(messages, attempts=5).assess(content())
+    assert len(messages.calls) == 1, "an auth error was retried"
+
+
+async def test_a_schema_violation_is_not_retried():
+    """An identical request will produce the same invalid reply."""
+
+    class Boom(Exception):
+        pass
+
+    messages = StubMessages(error=Boom("schema violation"))
+    with pytest.raises(DetectorUnavailable):
+        await detector_with(messages, attempts=5).assess(content())
+    assert len(messages.calls) == 1
