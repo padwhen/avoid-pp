@@ -5,11 +5,11 @@
 A Go/Python workspace for a prompt-injection detection API, initially evaluated
 around Finnish-to-English LLM translation.
 
-**Status: C11 — a working Go → Python → policy slice with a real evaluator.**
-The scan endpoint reaches the detector and returns an assessment and a decision
-under a configured monitoring or enforcement policy. The detector still matches
-keywords rather than understanding text until C13, and no LLM provider is
-called anywhere.
+**Status: C12 — the slice runs with one command.** `make up` starts both
+services in containers; the scan endpoint reaches the detector and returns an
+assessment and a decision under a configured monitoring or enforcement policy.
+The detector still matches keywords rather than understanding text until C13,
+and no LLM provider is called anywhere.
 
 Go will own the API, authentication, request limits and policy decisions. Python
 will own model integration, assessment validation and evaluation logic. The
@@ -131,6 +131,35 @@ name the variable and the requirement, never the value, because configuration
 carries credentials. Ctrl-C drains in-flight requests within
 `AVOIDPP_SHUTDOWN_TIMEOUT` rather than cutting them off. See
 [C07 acceptance criteria](docs/c07-gateway.md).
+
+## Quick start
+
+```sh
+make up      # build and start both services in containers
+make smoke   # exercise the stack and assert what comes back
+make down
+```
+
+```text
+health
+  ok    liveness
+  ok    readiness
+scans
+  ok    ordinary Finnish -> HTTP 200, action allow
+  ok    attack passage -> action flag
+rejections
+  ok    caller-supplied policy -> HTTP 400
+  ok    unknown task id -> HTTP 422
+```
+
+Only the gateway is published to the host, on port 8099. The detector declares
+no ports at all and is reachable only from the gateway over the internal
+network — a detector exposed to the host would let anything on the machine
+request an assessment directly, bypassing validation, limits and policy. See
+[C12 acceptance criteria](docs/c12-compose.md).
+
+macOS has no container runtime by default; `brew install colima docker-compose
+docker-buildx && colima start` is the lightest option that works.
 
 ## Scanning end to end
 

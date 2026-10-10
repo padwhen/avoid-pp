@@ -1,0 +1,68 @@
+# Local development topology for the C01-C12 slice.
+#
+# Two properties matter more than convenience here:
+#
+#   * The detector is private. It publishes no host port, so it is reachable
+#     only from the gateway over the internal network. A detector exposed to
+#     the host would let anything on the machine request an assessment
+#     directly, bypassing the gateway's validation, limits and policy.
+#   * Everything runs in fake mode. No provider credential is read, and no
+#     paid API is called. Live inference arrives at C13 behind its own
+#     configuration.
+
+name: avoid-pp
+
+services:
+  detector:
+    build:
+      context: ./detector
+    environment:
+      AVOIDPP_DETECTOR_MODE: fake
+      AVOIDPP_DETECTOR_DETECTOR_VERSION: fake-0
+    # Deliberately no `ports:`. Reachable at http://detector:9000 on the
+    # internal network and nowhere else.
+    networks:
+      - internal
+    healthcheck:
+      # The image has no curl or wget, so the check uses the interpreter that
+      # is already present. /readyz fails until the detector has started.
+      test: ["CMD", "python", "-c",
+             "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:9000/readyz', timeout=2).status == 200 else 1)"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: ./gateway
+    environment:
+      AVOIDPP_ADDR: ":8080"
+      AVOIDPP_DETECTOR_URL: http://detector:9000
+      AVOIDPP_POLICY_MODE: ${AVOIDPP_POLICY_MODE:-monitoring}
+      AVOIDPP_LOG_LEVEL: ${AVOIDPP_LOG_LEVEL:-info}
+    ports:
+      # The only thing published to the host. 8099 by default because 8080 is
+      # commonly taken by another local service.
+      - "${AVOIDPP_HOST_PORT:-8099}:8080"
+    depends_on:
+      detector:
+        condition: service_healthy
+    networks:
+      - internal
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+
+networks:
+  internal:
+    driver: bridge
