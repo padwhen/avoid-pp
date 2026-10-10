@@ -9,6 +9,9 @@
 #   * Everything runs in fake mode. No provider credential is read, and no
 #     paid API is called. Live inference arrives at C13 behind its own
 #     configuration.
+#   * The gateway's caller credentials have no default. There is no key in
+#     this file to forget to change; `make dev-key` generates one into the
+#     gitignored .env, and Compose refuses to start without it.
 
 name: avoid-pp
 
@@ -46,6 +49,9 @@ services:
       AVOIDPP_ADDR: ":8080"
       AVOIDPP_DETECTOR_URL: http://detector:9000
       AVOIDPP_POLICY_MODE: ${AVOIDPP_POLICY_MODE:-monitoring}
+      # No default. A development key committed to the repository would be a
+      # public credential, so Compose fails here instead of substituting one.
+      AVOIDPP_API_KEYS: ${AVOIDPP_API_KEYS:?run `make dev-key` to generate one into .env}
       AVOIDPP_LOG_LEVEL: ${AVOIDPP_LOG_LEVEL:-info}
     ports:
       # The only thing published to the host. 8099 by default because 8080 is

@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/padwhen/avoid-pp/gateway/internal/auth"
 	"github.com/padwhen/avoid-pp/gateway/internal/contract"
 	"github.com/padwhen/avoid-pp/gateway/internal/detector"
 	"github.com/padwhen/avoid-pp/gateway/internal/middleware"
@@ -35,6 +36,10 @@ type ScanDeps struct {
 	// choose the policy it is judged under. An empty value is rejected by
 	// the evaluator rather than defaulting to the permissive branch.
 	Mode policy.Mode
+
+	// Callers authenticates requests. Like Mode it is configuration: a
+	// request cannot name its own caller, tenant or permitted tasks.
+	Callers *auth.Registry
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {
@@ -88,11 +93,31 @@ func Scan(deps ScanDeps) http.Handler {
 		}
 
 		if code, message, ok := validateScanRequest(req); !ok {
-			status := http.StatusUnprocessableEntity
-			if code == contract.ErrCodeUnknownTaskID {
-				status = http.StatusUnprocessableEntity
-			}
-			writeError(w, r, status, code, message)
+			writeError(w, r, http.StatusUnprocessableEntity, code, message)
+			return
+		}
+
+		// Authorisation, now that the task is known and valid.
+		//
+		// A caller that reached here without passing through Authenticate is
+		// refused rather than treated as anonymous: a route wired up without
+		// the middleware must fail loudly, not serve unauthenticated scans.
+		caller, authenticated := auth.CallerFrom(r.Context())
+		if !authenticated {
+			log.Error("scan handler reached without authentication",
+				"request_id", requestID)
+			writeError(w, r, http.StatusUnauthorized,
+				contract.ErrCodeUnauthenticated, "Valid credentials are required.")
+			return
+		}
+		if !caller.MayUse(req.TaskID) {
+			// The caller is known, so naming the task it asked for discloses
+			// nothing it did not already send.
+			log.Warn("scan request rejected: task not permitted",
+				"request_id", requestID, "caller", caller.Name, "task_id", req.TaskID)
+			writeError(w, r, http.StatusForbidden,
+				contract.ErrCodeUnauthorizedTask,
+				"This caller is not authorized for the requested task.")
 			return
 		}
 
@@ -154,7 +179,7 @@ func Scan(deps ScanDeps) http.Handler {
 }
 
 func validateScanRequest(req contract.ScanRequest) (contract.ErrorCode, string, bool) {
-	if req.TaskID != contract.TaskTranslateFiEnV1 {
+	if !req.TaskID.Valid() {
 		return contract.ErrCodeUnknownTaskID, "Unknown task_id.", false
 	}
 	if req.Content.SourceType != contract.SourceTranslationInput {

@@ -29,6 +29,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/padwhen/avoid-pp/gateway/internal/api"
+	"github.com/padwhen/avoid-pp/gateway/internal/auth"
 	"github.com/padwhen/avoid-pp/gateway/internal/contract"
 	"github.com/padwhen/avoid-pp/gateway/internal/detector"
 	"github.com/padwhen/avoid-pp/gateway/internal/policy"
@@ -107,8 +108,25 @@ func newStack(t *testing.T) (http.Handler, *capture) {
 		Timeout:  5 * time.Second,
 		Log:      slog.New(slog.NewTextHandler(io.Discard, nil)),
 		Mode:     policy.ModeMonitoring,
+		Callers:  testRegistry(t),
 	})
 	return router, cap
+}
+
+// integrationKey is a fixed development credential, local to these tests.
+const integrationKey = "integration-key-bbbbbbbbbbbbbbbbbbbb"
+
+func testRegistry(t *testing.T) *auth.Registry {
+	t.Helper()
+	registry, err := auth.NewRegistry([]auth.KeySpec{{
+		Name:  "integration",
+		Key:   integrationKey,
+		Tasks: []contract.TaskID{contract.TaskTranslateFiEnV1},
+	}})
+	if err != nil {
+		t.Fatalf("build registry: %v", err)
+	}
+	return registry
 }
 
 func scan(t *testing.T, router http.Handler, text, hint string) *httptest.ResponseRecorder {
@@ -131,6 +149,7 @@ func scan(t *testing.T, router http.Handler, text, hint string) *httptest.Respon
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/scans", bytes.NewReader(raw))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+integrationKey)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 	return rec
@@ -362,6 +381,7 @@ func TestRejectedRequestsNeverReachTheDetector(t *testing.T) {
 			router, cap := newStack(t)
 
 			req := httptest.NewRequest(http.MethodPost, "/v1/scans", strings.NewReader(body))
+			req.Header.Set("Authorization", "Bearer "+integrationKey)
 			req.Header.Set("Content-Type", "application/json")
 			rec := httptest.NewRecorder()
 			router.ServeHTTP(rec, req)
