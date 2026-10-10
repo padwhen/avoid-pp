@@ -67,6 +67,16 @@ paths:
           content:
             application/json:
               schema: { $ref: './schemas/error.schema.json' }
+        '415':
+          description: >
+            Content-Type is not application/json. Code
+            `unsupported_media_type`. Documented at C41: the code and the
+            gateway's behaviour have both existed since C20, and this response
+            was missing here, so a client written from this document alone
+            would have had no mapping for a status it can certainly receive.
+          content:
+            application/json:
+              schema: { $ref: './schemas/error.schema.json' }
         '422':
           description: >
             Schema violation or token-budget violation. Codes `schema_invalid`,

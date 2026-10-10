@@ -34,3 +34,19 @@ prose.
 
 See [C27 acceptance criteria](../docs/c27-translator.md). The integration that
 puts the guard in front of this is C28.
+
+## Which integration to copy
+
+There are two, and they do the same thing.
+
+- **`sdk_integration.py`** — built on [the SDK client](../sdk/README.md).
+  Copy this one. The HTTP call, the status mapping and the digest-bound ticket
+  come from the client, so what is left is the part that is actually yours:
+  what to do about a flag, and what to say when a translation did not happen.
+- **`protected_backend/`** — C28's version, which wrote all of that by hand
+  because there was no client yet. Kept because it is the code the C26 and C29
+  measurements ran through; replacing it would leave those reports describing
+  something that no longer exists.
+
+Both enforce the decision server-side and translate the exact scanned bytes.
+See [C41](../docs/c41-sdk.md).

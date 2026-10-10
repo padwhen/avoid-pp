@@ -72,6 +72,12 @@ jobs:
       - name: Contract validator self-test
         run: make check-contracts-selftest
 
+      # The SDK is a second Go module and a path-based Python package, so
+      # neither `./...` in gateway/ nor the detector project's own checks see
+      # it. Named explicitly, or it would be unbuilt code that looks covered.
+      - name: Check SDK clients
+        run: make check-sdk
+
       - name: Check examples
         run: make check-examples
 

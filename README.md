@@ -92,6 +92,7 @@ detector/                    Installable Python package and locked developer too
 contracts/                   Public/private API schemas, OpenAPI and shared fixtures
 evals/                       Future reviewed datasets, runners and generated reports
 examples/                    Future protected-translator integration example
+sdk/                         Thin typed scan clients, Python and Go
 docs/                        Implementation notes and acceptance evidence
 ```
 
@@ -679,6 +680,54 @@ end until now. The strictness was kept; what was missing was a test checking
 the Go struct against the schema, which now exists.
 
 See [C28 acceptance criteria](docs/c28-enforce-scan.md).
+
+## Calling the scan API
+
+```python
+from avoidpp import ScanClient, permits_translation
+
+async with ScanClient(
+    base_url="https://gateway.internal", api_key=key, timeout_seconds=20.0
+) as client:
+    verdict = await client.scan(passage, content_id="doc-17")
+
+if permits_translation(verdict) and verdict.covers(passage):
+    await translate(passage)
+```
+
+```go
+verdict, err := client.Scan(ctx, avoidpp.Input{Text: passage, ContentID: "doc-17"})
+if err != nil {
+    return err // a scan that did not happen is not an allow
+}
+if verdict.PermitsTranslation(false) && verdict.Covers(passage) {
+    translate(passage)
+}
+```
+
+[`sdk/`](sdk/) holds both clients. The wire types already existed — in
+`gateway/internal/contract` and in the detector's Pydantic models — and
+neither is reachable by a caller, which is what these are for.
+
+They are thin on purpose. Every convenience a scan client could grow — a
+cached verdict, a fallback, a circuit breaker that opens into `allow` — is a
+way for a passage to reach a model without having been scanned. So four
+things are refused outright: there is no boolean `is_safe()`, because
+`flag` is a real third answer and whether it proceeds is the deployment's
+decision; no failure that reads as success, because the zero Go `Verdict`
+permits nothing and every Python failure raises; no retry unless the server
+said the work did not happen, because a scan is a paid provider call; and no
+tidying of the passage, because the bytes you pass are the bytes scanned.
+
+Both are held to one table —
+[`sdk/contract-expectations.json`](sdk/contract-expectations.json), 48 cases
+over the contract fixtures — so the two cannot quietly disagree. They already
+did once, about wrong-typed JSON fields, which is how it was found.
+
+Writing them also turned up two gaps in the contract documents: `415` was
+missing from `openapi.yaml` despite the gateway returning it since C20, and
+`token_budget_exceeded` is a code the schema permits that nothing can emit.
+See [C41 acceptance criteria](docs/c41-sdk.md).
 
 ## Running the detector
 
