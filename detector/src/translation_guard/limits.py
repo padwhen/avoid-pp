@@ -54,6 +54,21 @@ class InputTooLarge(ValueError):
     """The passage exceeds a bound and must not be scanned in part."""
 
 
+class PassageTooLarge(InputTooLarge):
+    """Over the byte ceiling. Maps to payload_too_large (413)."""
+
+
+class TokenBudgetExceeded(InputTooLarge):
+    """Over the token budget. Maps to token_budget_exceeded (422).
+
+    Split from the byte case at C32. Both were a single exception that the
+    Claude adapter wrapped as DetectorUnavailable, so a caller sending a
+    passage that was merely too long was told the detector was down - a
+    permanent request-sizing error reported as a transient outage, and one
+    worth retrying forever. The two codes the contract already defines say
+    the true thing, and `token_budget_exceeded` had no emitter until now."""
+
+
 @dataclass(frozen=True)
 class Budget:
     """What one request is allowed to consume."""
@@ -94,13 +109,13 @@ def check(text: str, budget: Budget | None = None) -> int:
 
     encoded = len(text.encode("utf-8"))
     if encoded > limits.max_passage_bytes:
-        raise InputTooLarge(
+        raise PassageTooLarge(
             f"passage is {encoded} UTF-8 bytes, over the {limits.max_passage_bytes} limit"
         )
 
     estimated = estimate_tokens(text)
     if estimated > limits.max_source_tokens:
-        raise InputTooLarge(
+        raise TokenBudgetExceeded(
             f"passage is approximately {estimated} tokens, over the "
             f"{limits.max_source_tokens} limit "
             f"(estimated at {CONSERVATIVE_CHARS_PER_TOKEN} characters per token)"

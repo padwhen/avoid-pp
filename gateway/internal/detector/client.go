@@ -46,7 +46,40 @@ var (
 	ErrResponseTooLarge = errors.New("detector response too large")
 	// ErrDeadlineExceeded means the budget expired before an answer arrived.
 	ErrDeadlineExceeded = errors.New("detector deadline exceeded")
+
+	// ErrPassageTooLarge and ErrTokenBudgetExceeded mean the detector
+	// refused the passage for its size.
+	//
+	// Separate from ErrUnavailable because they are the caller's problem and
+	// not the service's, and the difference is the difference between "retry
+	// in a moment" and "send less text". Until C32 every detector non-200
+	// became ErrUnavailable, so a passage merely too long was reported as an
+	// outage - a permanent condition dressed as a transient one, which a
+	// well-behaved client will retry forever.
+	ErrPassageTooLarge     = errors.New("detector refused the passage size")
+	ErrTokenBudgetExceeded = errors.New("detector refused the passage token count")
 )
+
+// detectorErrorCode reads the stable code from an error envelope.
+//
+// Takes the bytes already read rather than the response body: by the time
+// the status is examined the body has been consumed into `payload`, and a
+// first draft of this read from the drained stream and silently saw nothing.
+// The test for the 422 case is what caught it.
+//
+// An unreadable body yields "", which falls through to the conservative
+// branch rather than to a specific one.
+func detectorErrorCode(payload []byte) string {
+	var envelope struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(payload, &envelope) != nil {
+		return ""
+	}
+	return envelope.Error.Code
+}
 
 // AssessmentRequest is the private request body.
 type AssessmentRequest struct {
@@ -166,6 +199,22 @@ func (c *Client) Assess(ctx context.Context, req AssessmentRequest) (*Assessment
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		// Two statuses carry information the caller can act on; everything
+		// else is an outage from the gateway's point of view. The error code
+		// in the body is read rather than inferred from the status, because
+		// 422 covers more than one condition in this contract.
+		switch resp.StatusCode {
+		case http.StatusRequestEntityTooLarge:
+			return nil, fmt.Errorf("%w: detector returned 413", ErrPassageTooLarge)
+		case http.StatusUnprocessableEntity:
+			if detectorErrorCode(payload) == "token_budget_exceeded" {
+				return nil, fmt.Errorf("%w: detector returned 422", ErrTokenBudgetExceeded)
+			}
+			// A 422 that is not about size means the gateway sent something
+			// the detector could not parse, which is this service's bug and
+			// not the caller's.
+			return nil, fmt.Errorf("%w: detector returned 422", ErrInvalidResponse)
+		}
 		return nil, fmt.Errorf("%w: detector returned %d", ErrUnavailable, resp.StatusCode)
 	}
 

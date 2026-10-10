@@ -39,6 +39,7 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 // ErrQueueFull means both the slots and the waiting queue were full.
@@ -92,6 +93,22 @@ type Controller struct {
 	admitted  atomic.Int64
 	rejected  atomic.Int64
 	cancelled atomic.Int64
+
+	// Time spent waiting for a slot, for requests that had to wait at all.
+	//
+	// Queue wait is the number that distinguishes "the provider is slow" from
+	// "we are overloaded", and nothing here measured it before C32. Both look
+	// identical in end-to-end latency, and the two have opposite remedies: a
+	// slow provider wants a longer deadline, an overloaded gateway wants more
+	// slots or fewer arrivals.
+	//
+	// A sum and a count rather than a histogram, because the sum answers
+	// "what fraction of latency is ours" and a histogram is a dependency.
+	// The maximum is kept separately, since a mean hides exactly the request
+	// that timed out.
+	waitNanos    atomic.Int64
+	waitCount    atomic.Int64
+	maxWaitNanos atomic.Int64
 }
 
 // New builds a controller with fixed capacity.
@@ -139,16 +156,36 @@ func (c *Controller) Acquire(ctx context.Context) (func(), error) {
 	c.observePeak(&c.peakQueued, c.queued.Load())
 	defer c.queued.Add(-1)
 
+	// Only the slow path is timed. A request that took a free slot waited
+	// zero by construction, and reading a clock for it would charge every
+	// uncontended request for a measurement that can only say "nothing
+	// happened".
+	queuedAt := time.Now()
+
 	select {
 	case c.slots <- struct{}{}:
+		c.observeWait(time.Since(queuedAt))
 		c.onAdmitted()
 		return c.releaser(), nil
 	case <-ctx.Done():
 		// The caller hung up or ran out of deadline while queued. No slot was
 		// taken, so there is nothing to release.
+		//
+		// The wait is still recorded. A request that waited four seconds and
+		// then gave up spent four seconds of queue, and omitting it would
+		// make the queue look healthiest exactly when it is worst — the
+		// abandoned waits are the long ones.
+		c.observeWait(time.Since(queuedAt))
 		c.cancelled.Add(1)
 		return nil, ctx.Err()
 	}
+}
+
+func (c *Controller) observeWait(waited time.Duration) {
+	nanos := waited.Nanoseconds()
+	c.waitNanos.Add(nanos)
+	c.waitCount.Add(1)
+	c.observePeak(&c.maxWaitNanos, nanos)
 }
 
 // releaser returns a release function that cannot be made to over-release.
@@ -190,6 +227,22 @@ type Stats struct {
 	Admitted   int64
 	Rejected   int64
 	Cancelled  int64
+
+	// WaitCount is how many requests queued at all; WaitTotal is their summed
+	// wait and MaxWait the worst single one. Requests that took a free slot
+	// immediately are not counted, so MeanWait answers "when we queued, how
+	// long for" rather than diluting it across traffic that never waited.
+	WaitCount int64
+	WaitTotal time.Duration
+	MaxWait   time.Duration
+}
+
+// MeanWait is the average wait among requests that actually queued.
+func (s Stats) MeanWait() time.Duration {
+	if s.WaitCount == 0 {
+		return 0
+	}
+	return s.WaitTotal / time.Duration(s.WaitCount)
 }
 
 // Stats reports current and peak occupancy.
@@ -208,6 +261,9 @@ func (c *Controller) Stats() Stats {
 		Admitted:   c.admitted.Load(),
 		Rejected:   c.rejected.Load(),
 		Cancelled:  c.cancelled.Load(),
+		WaitCount:  c.waitCount.Load(),
+		WaitTotal:  time.Duration(c.waitNanos.Load()),
+		MaxWait:    time.Duration(c.maxWaitNanos.Load()),
 	}
 }
 

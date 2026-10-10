@@ -1,0 +1,248 @@
+{
+  "generated_at": "2026-10-10T22:18:19Z",
+  "hardware": {
+    "go_version": "go1.27.2",
+    "goarch": "arm64",
+    "gomaxprocs": 8,
+    "goos": "darwin",
+    "note": "unnamed hardware",
+    "num_cpu": 8
+  },
+  "method": {
+    "detector": "in-process stub with injected latency; no provider is called",
+    "provider_p50_source": "evals/reports/milestones/c26-live-development.json",
+    "separation": "injected latency is provider work by construction; everything above it is gateway overhead"
+  },
+  "overhead": {
+    "maximum": {
+      "admission": {
+        "admitted": 200,
+        "cancelled": 0,
+        "max_active": 4,
+        "max_queued": 4,
+        "max_wait_ms": 0,
+        "mean_wait_ms": 0,
+        "peak_active": 1,
+        "peak_queued": 0,
+        "queued_requests": 0,
+        "rejected": 0
+      },
+      "bytes_per_request": 754690,
+      "concurrency": 1,
+      "error_rate": 0,
+      "errors_by_code": {},
+      "latency_ms": {
+        "max": 0.673,
+        "mean": 0.388,
+        "min": 0.295,
+        "p50": 0.359,
+        "p90": 0.485,
+        "p95": 0.503,
+        "p99": 0.595,
+        "samples": 200
+      },
+      "peak_heap_in_use_mb": 3.6328,
+      "peak_heap_note": "whole test process: gateway, in-process stub detector and the harness itself. An upper bound on the gateway alone, not an attribution.",
+      "requests": 200,
+      "text_bytes": 34078,
+      "text_chars": 32768,
+      "throughput_per_sec": 2567.6921,
+      "wall_clock_seconds": 0.0779
+    },
+    "short": {
+      "admission": {
+        "admitted": 200,
+        "cancelled": 0,
+        "max_active": 4,
+        "max_queued": 4,
+        "max_wait_ms": 0,
+        "mean_wait_ms": 0,
+        "peak_active": 1,
+        "peak_queued": 0,
+        "queued_requests": 0,
+        "rejected": 0
+      },
+      "bytes_per_request": 25684,
+      "concurrency": 1,
+      "error_rate": 0,
+      "errors_by_code": {},
+      "latency_ms": {
+        "max": 1.643,
+        "mean": 0.151,
+        "min": 0.103,
+        "p50": 0.131,
+        "p90": 0.18,
+        "p95": 0.212,
+        "p99": 0.37,
+        "samples": 200
+      },
+      "peak_heap_in_use_mb": 4.0703,
+      "peak_heap_note": "whole test process: gateway, in-process stub detector and the harness itself. An upper bound on the gateway alone, not an attribution.",
+      "requests": 200,
+      "text_bytes": 52,
+      "text_chars": 50,
+      "throughput_per_sec": 6529.3507,
+      "wall_clock_seconds": 0.0306
+    },
+    "typical": {
+      "admission": {
+        "admitted": 200,
+        "cancelled": 0,
+        "max_active": 4,
+        "max_queued": 4,
+        "max_wait_ms": 0,
+        "mean_wait_ms": 0,
+        "peak_active": 1,
+        "peak_queued": 0,
+        "queued_requests": 0,
+        "rejected": 0
+      },
+      "bytes_per_request": 25688,
+      "concurrency": 1,
+      "error_rate": 0,
+      "errors_by_code": {},
+      "latency_ms": {
+        "max": 0.378,
+        "mean": 0.086,
+        "min": 0.06,
+        "p50": 0.076,
+        "p90": 0.111,
+        "p95": 0.119,
+        "p99": 0.151,
+        "samples": 200
+      },
+      "peak_heap_in_use_mb": 3.8906,
+      "peak_heap_note": "whole test process: gateway, in-process stub detector and the harness itself. An upper bound on the gateway alone, not an attribution.",
+      "requests": 200,
+      "text_bytes": 155,
+      "text_chars": 150,
+      "throughput_per_sec": 11373.2222,
+      "wall_clock_seconds": 0.0176
+    }
+  },
+  "saturation": {
+    "at_capacity": {
+      "admission": {
+        "admitted": 8,
+        "cancelled": 0,
+        "max_active": 4,
+        "max_queued": 4,
+        "max_wait_ms": 0,
+        "mean_wait_ms": 0,
+        "peak_active": 4,
+        "peak_queued": 0,
+        "queued_requests": 0,
+        "rejected": 0
+      },
+      "bytes_per_request": 69769,
+      "concurrency": 4,
+      "error_rate": 0,
+      "errors_by_code": {},
+      "latency_ms": {
+        "max": 2834.955,
+        "mean": 2834.577,
+        "min": 2834.208,
+        "p50": 2834.235,
+        "p90": 2834.931,
+        "p95": 2834.931,
+        "p99": 2834.931,
+        "samples": 8
+      },
+      "offered_concurrency": 4,
+      "peak_heap_in_use_mb": 2.6094,
+      "peak_heap_note": "whole test process: gateway, in-process stub detector and the harness itself. An upper bound on the gateway alone, not an attribution.",
+      "requests": 8,
+      "text_bytes": 155,
+      "text_chars": 150,
+      "theoretical_throughput_per_second": 1.4119,
+      "throughput_per_sec": 1.4111,
+      "wall_clock_seconds": 5.6692
+    },
+    "far_over_capacity": {
+      "admission": {
+        "admitted": 8,
+        "cancelled": 0,
+        "max_active": 4,
+        "max_queued": 4,
+        "max_wait_ms": 2836.147,
+        "mean_wait_ms": 2836.128,
+        "peak_active": 4,
+        "peak_queued": 4,
+        "queued_requests": 4,
+        "rejected": 56
+      },
+      "bytes_per_request": 19200,
+      "concurrency": 64,
+      "error_rate": 0.875,
+      "errors_by_code": {
+        "overloaded": 56
+      },
+      "latency_ms": {
+        "max": 5671.094,
+        "mean": 4253.627,
+        "min": 2836.22,
+        "p50": 2836.325,
+        "p90": 5671.075,
+        "p95": 5671.075,
+        "p99": 5671.075,
+        "samples": 8
+      },
+      "offered_concurrency": 64,
+      "peak_heap_in_use_mb": 3.9609,
+      "peak_heap_note": "whole test process: gateway, in-process stub detector and the harness itself. An upper bound on the gateway alone, not an attribution.",
+      "requests": 64,
+      "text_bytes": 155,
+      "text_chars": 150,
+      "theoretical_throughput_per_second": 1.4119,
+      "throughput_per_sec": 11.285,
+      "wall_clock_seconds": 5.6712
+    },
+    "over_capacity": {
+      "admission": {
+        "admitted": 8,
+        "cancelled": 0,
+        "max_active": 4,
+        "max_queued": 4,
+        "max_wait_ms": 2834.153,
+        "mean_wait_ms": 2834.136,
+        "peak_active": 4,
+        "peak_queued": 4,
+        "queued_requests": 4,
+        "rejected": 16
+      },
+      "bytes_per_request": 28120,
+      "concurrency": 16,
+      "error_rate": 0.6667,
+      "errors_by_code": {
+        "overloaded": 16
+      },
+      "latency_ms": {
+        "max": 5669.47,
+        "mean": 4251.843,
+        "min": 2834.249,
+        "p50": 2834.285,
+        "p90": 5669.46,
+        "p95": 5669.46,
+        "p99": 5669.46,
+        "samples": 8
+      },
+      "offered_concurrency": 16,
+      "peak_heap_in_use_mb": 3.3047,
+      "peak_heap_note": "whole test process: gateway, in-process stub detector and the harness itself. An upper bound on the gateway alone, not an attribution.",
+      "requests": 24,
+      "text_bytes": 155,
+      "text_chars": 150,
+      "theoretical_throughput_per_second": 1.4119,
+      "throughput_per_sec": 4.2332,
+      "wall_clock_seconds": 5.6695
+    }
+  },
+  "shipped_defaults": {
+    "caller_rate": "1/5",
+    "global_rate": "1/8",
+    "max_active": 4,
+    "max_queued": 4,
+    "max_request_byte": 65536,
+    "scan_timeout": "15s"
+  }
+}

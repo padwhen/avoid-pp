@@ -496,7 +496,7 @@
     },
     {
       "name": "token budget exceeded",
-      "note": "Defined by error.schema.json and documented at 422 in openapi.yaml, and the gateway has no constant for it, so it cannot currently be emitted. The clients handle it anyway: a code the contract permits is not a code a client may meet with a crash.",
+      "note": "Defined by error.schema.json and documented at 422 in openapi.yaml. When this case was written nothing could emit it, and the clients handled it anyway because a code the contract permits is not a code a client may meet with a crash. C32 gave it an emitter: the detector's token budget was already being enforced and reported as a 503, which made a permanent sizing error look transient.",
       "status": 422,
       "body": {
         "request_id": "req-inline-10",
