@@ -1,0 +1,185 @@
+"""Validate the C05 Finnish seed dataset while it is being written.
+
+Designed to be run repeatedly during authoring, not only at the end:
+
+  * structural problems (bad enum, duplicate id, missing required field) FAIL,
+    so a mistake is caught at case 5 rather than case 73;
+  * an incomplete dataset does NOT fail. Remaining counts are reported as
+    progress so this can sit in `make check` from the first case onward.
+
+Completion is reported separately, and requires every format-example row to
+have been replaced or re-reviewed.
+
+Run with `make check-evals`.
+"""
+
+from __future__ import annotations
+
+import sys
+from collections import Counter, defaultdict
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+ROOT = Path(__file__).resolve().parent
+DATASET = ROOT / "datasets" / "seed-fi.yaml"
+
+TARGETS: dict[str, int] = {
+    "ordinary": 20,
+    "imperative": 15,
+    "quoted_attack": 10,
+    "task_redirection": 15,
+    "detector_targeting": 8,
+    "mixed_language": 5,
+}
+
+LABELS = {"no_injection_detected", "suspicious"}
+OUTCOMES = {"faithful_translation", "blocked_or_refused"}
+REVIEW = {"reviewed", "pending_review", "synthetic"}
+PROVENANCE = {"authored", "adapted", "public_domain", "example"}
+RIGHTS = {"own", "public_domain", "cc-by"}
+
+# Categories whose expected English translation is needed for outcome grading.
+NEEDS_ENGLISH = {"quoted_attack", "task_redirection", "detector_targeting"}
+
+# The label each category must carry. Encodes the rule the dataset exists to
+# teach: a quoted attack is material to translate, not an attack on us.
+REQUIRED_LABEL = {
+    "ordinary": "no_injection_detected",
+    "imperative": "no_injection_detected",
+    "quoted_attack": "no_injection_detected",
+    "task_redirection": "suspicious",
+    "detector_targeting": "suspicious",
+}
+
+REQUIRED_FIELDS = (
+    "id",
+    "text",
+    "category",
+    "group",
+    "expected_label",
+    "expected_outcome",
+    "review_status",
+    "provenance",
+    "rights",
+)
+
+
+def check_case(case: Any, index: int, seen_ids: set[str], errors: list[str]) -> None:
+    where = f"case #{index}"
+    if not isinstance(case, dict):
+        errors.append(f"{where}: expected a mapping, got {type(case).__name__}")
+        return
+
+    case_id = case.get("id")
+    if isinstance(case_id, str) and case_id:
+        where = case_id
+        if case_id in seen_ids:
+            errors.append(f"{where}: duplicate id")
+        seen_ids.add(case_id)
+
+    for field in REQUIRED_FIELDS:
+        if case.get(field) in (None, ""):
+            errors.append(f"{where}: missing required field '{field}'")
+
+    category = case.get("category")
+    if category is not None and category not in TARGETS:
+        errors.append(f"{where}: unknown category '{category}'")
+
+    for field, allowed in (
+        ("expected_label", LABELS),
+        ("expected_outcome", OUTCOMES),
+        ("review_status", REVIEW),
+        ("provenance", PROVENANCE),
+        ("rights", RIGHTS),
+    ):
+        value = case.get(field)
+        if value is not None and value not in allowed:
+            errors.append(
+                f"{where}: {field}='{value}' is not one of {sorted(allowed)}"
+            )
+
+    required_label = REQUIRED_LABEL.get(str(category))
+    actual_label = case.get("expected_label")
+    if required_label and actual_label and actual_label != required_label:
+        hint = ""
+        if category == "quoted_attack":
+            hint = (
+                " A quoted attack is material to translate, not an instruction "
+                "to this system; blocking it is a false positive."
+            )
+        errors.append(
+            f"{where}: category '{category}' requires "
+            f"expected_label='{required_label}', got '{actual_label}'.{hint}"
+        )
+
+    if category in NEEDS_ENGLISH and not case.get("expected_english"):
+        errors.append(
+            f"{where}: category '{category}' requires expected_english "
+            "(outcome grading at C29 needs the faithful translation)"
+        )
+
+    if category == "mixed_language" and case.get("deferred_quality") is not True:
+        errors.append(f"{where}: mixed_language requires deferred_quality: true")
+
+    if category != "mixed_language" and case.get("deferred_quality"):
+        errors.append(f"{where}: deferred_quality is only for mixed_language")
+
+    text = case.get("text")
+    if isinstance(text, str) and not text.strip():
+        errors.append(f"{where}: text is blank")
+
+
+def main() -> int:
+    if not DATASET.exists():
+        print(f"evals: {DATASET} not found", file=sys.stderr)
+        return 1
+
+    document = yaml.safe_load(DATASET.read_text(encoding="utf-8")) or {}
+    cases = document.get("cases") or []
+    if not isinstance(cases, list):
+        print("evals: 'cases' must be a list", file=sys.stderr)
+        return 1
+
+    errors: list[str] = []
+    seen_ids: set[str] = set()
+    for index, case in enumerate(cases, start=1):
+        check_case(case, index, seen_ids, errors)
+
+    if errors:
+        print(f"evals: {len(errors)} problem(s) in {DATASET.name}", file=sys.stderr)
+        for error in errors:
+            print(f"  {error}", file=sys.stderr)
+        return 1
+
+    counts = Counter(str(c.get("category")) for c in cases)
+    groups: dict[str, set[str]] = defaultdict(set)
+    for case in cases:
+        groups[str(case.get("group"))].add(str(case.get("category")))
+
+    examples = sum(1 for c in cases if c.get("provenance") == "example")
+    pending = sum(1 for c in cases if c.get("review_status") != "reviewed")
+    total_target = sum(TARGETS.values())
+
+    print(f"evals: {len(cases)}/{total_target} cases, no structural problems")
+    for category, target in TARGETS.items():
+        have = counts.get(category, 0)
+        mark = "ok  " if have >= target else "    "
+        print(f"  {mark}{category:<20} {have:>3}/{target}")
+
+    print(f"  groups: {len(groups)} (variants of one idea must share a group)")
+    if pending:
+        print(f"  not yet reviewed: {pending} (reported separately by C06)")
+    if examples:
+        print(f"  format examples still present: {examples} - replace or re-review")
+
+    if len(cases) >= total_target and examples == 0:
+        print("evals: dataset COMPLETE for C05")
+    else:
+        print("evals: dataset incomplete - this is not a failure yet")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
