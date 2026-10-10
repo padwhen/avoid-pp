@@ -14,6 +14,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/padwhen/avoid-pp/gateway/internal/admission"
 	"github.com/padwhen/avoid-pp/gateway/internal/api"
 	"github.com/padwhen/avoid-pp/gateway/internal/auth"
 	"github.com/padwhen/avoid-pp/gateway/internal/config"
@@ -64,6 +65,13 @@ func run() error {
 	log.Info("rate limits configured",
 		"rates", limiter.Describe(), "buckets", limiter.BucketCount())
 
+	// Bounds how much inference runs at once. Fixed capacity, allocated here.
+	admitter, err := admission.New(cfg.Admission)
+	if err != nil {
+		return fmt.Errorf("admission control: %w", err)
+	}
+	log.Info("admission control configured", "bounds", admitter.Describe())
+
 	readiness := api.NewReadiness()
 
 	// One client, reused for every scan: a per-request client would discard
@@ -73,12 +81,13 @@ func run() error {
 	srv, err := server.New(server.Options{
 		Addr: cfg.Addr,
 		Handler: api.NewRouter(readiness, api.ScanDeps{
-			Detector: client,
-			Timeout:  cfg.ScanTimeout,
-			Log:      log,
-			Mode:     cfg.PolicyMode,
-			Callers:  cfg.Callers,
-			Limiter:  limiter,
+			Detector:  client,
+			Timeout:   cfg.ScanTimeout,
+			Log:       log,
+			Mode:      cfg.PolicyMode,
+			Callers:   cfg.Callers,
+			Limiter:   limiter,
+			Admission: admitter,
 		}),
 		Drain: cfg.ShutdownTimeout,
 		Log:   log,

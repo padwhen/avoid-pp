@@ -60,6 +60,15 @@ class Settings(BaseSettings):
     # Per-request ceiling. The gateway's deadline still wins when it is lower.
     request_timeout_seconds: float = Field(default=15.0, gt=0, le=120)
 
+    # Concurrency bound, defence in depth behind the gateway's own.
+    #
+    # Set above the gateway's default of 4 on purpose: in normal operation the
+    # gateway sheds first and this never fires, so a rejection here means
+    # something is calling the detector directly or a second gateway replica
+    # exists. That is worth surfacing rather than absorbing silently.
+    max_active: int = Field(default=8, ge=1, le=256)
+    max_waiting: int = Field(default=16, ge=0, le=1024)
+
     # Set to force initialisation to fail, so readiness can be exercised
     # without a real dependency to break.
     fail_initialisation: bool = False

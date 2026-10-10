@@ -178,6 +178,10 @@ class ErrorBody(BaseModel):
 
     code: str
     message: Annotated[str, Field(min_length=1, max_length=512)]
+    # Present only on failures that are worth retrying. Omitted, not zero, on
+    # the rest: a retry_after_seconds of 0 reads as "retry immediately", which
+    # is advice no permanent failure should give.
+    retry_after_seconds: Annotated[int, Field(ge=1, le=3600)] | None = None
 
 
 class ErrorResponse(BaseModel):

@@ -28,6 +28,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/padwhen/avoid-pp/gateway/internal/admission"
 	"github.com/padwhen/avoid-pp/gateway/internal/api"
 	"github.com/padwhen/avoid-pp/gateway/internal/auth"
 	"github.com/padwhen/avoid-pp/gateway/internal/contract"
@@ -105,12 +106,13 @@ func newStack(t *testing.T) (http.Handler, *capture) {
 	readiness := api.NewReadiness()
 	readiness.SetReady()
 	router := api.NewRouter(readiness, api.ScanDeps{
-		Detector: detector.New(base, 5*time.Second),
-		Timeout:  5 * time.Second,
-		Log:      slog.New(slog.NewTextHandler(io.Discard, nil)),
-		Mode:     policy.ModeMonitoring,
-		Callers:  testRegistry(t),
-		Limiter:  testLimiter(t),
+		Detector:  detector.New(base, 5*time.Second),
+		Timeout:   5 * time.Second,
+		Log:       slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Mode:      policy.ModeMonitoring,
+		Callers:   testRegistry(t),
+		Limiter:   testLimiter(t),
+		Admission: testAdmission(t),
 	})
 	return router, cap
 }
@@ -144,6 +146,15 @@ func testLimiter(t *testing.T) *limits.Limiter {
 		t.Fatalf("limits.New: %v", err)
 	}
 	return limiter
+}
+
+func testAdmission(t *testing.T) *admission.Controller {
+	t.Helper()
+	controller, err := admission.New(admission.Config{MaxActive: 100, MaxQueued: 100})
+	if err != nil {
+		t.Fatalf("admission.New: %v", err)
+	}
+	return controller
 }
 
 func scan(t *testing.T, router http.Handler, text, hint string) *httptest.ResponseRecorder {

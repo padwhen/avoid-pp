@@ -403,6 +403,35 @@ verification and say so.
 
 See [C21 acceptance criteria](docs/c21-rate-limits.md).
 
+## Admission control
+
+A rate limit bounds how fast requests *arrive*; it says nothing about how many
+are still running. At 4.4 seconds a call, a perfectly compliant two requests
+per second leaves roughly nine in flight — and if the provider slows to thirty
+seconds, sixty. Every one of those callers obeyed the limit.
+
+So concurrency is bounded separately: four slots, a queue of eight, fixed at
+startup. Excess work gets 503 `overloaded` immediately, with retry guidance.
+
+The queue size is the interesting choice. With none, ordinary jitter produces
+errors for requests that would have been served milliseconds later. With an
+unbounded one, every arrival is accepted and callers wait behind work that
+will outlive their own deadlines while the service reports healthy and serves
+nobody. A small bounded queue absorbs the jitter and refuses the overload.
+
+Slots are held around the provider call only, so a request that was going to
+be refused for a malformed body never occupies one. They are released on every
+path including cancellation — a slot leaked when a client disconnects makes
+capacity drain monotonically, which looks like a memory leak and is not one.
+Two hundred cancelled rounds, then full capacity still available, is the test
+that would catch that.
+
+The detector bounds itself too, above the gateway's limit, because the
+gateway's bound is an assumption about a different process — a second replica,
+or anything else on the internal network calling the detector directly.
+
+See [C22 acceptance criteria](docs/c22-admission.md).
+
 ## Running the detector
 
 ```sh

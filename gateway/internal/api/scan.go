@@ -6,9 +6,11 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 	"unicode/utf8"
 
+	"github.com/padwhen/avoid-pp/gateway/internal/admission"
 	"github.com/padwhen/avoid-pp/gateway/internal/auth"
 	"github.com/padwhen/avoid-pp/gateway/internal/contract"
 	"github.com/padwhen/avoid-pp/gateway/internal/detector"
@@ -42,12 +44,42 @@ type ScanDeps struct {
 	// Limiter bounds the arrival rate. Its buckets are allocated from
 	// Callers, so it holds a fixed amount of state.
 	Limiter *limits.Limiter
+
+	// Admission bounds how much inference runs at once. A rate limit says
+	// nothing about how many calls are still in flight, which is the number
+	// that actually matters against a dependency measured in seconds.
+	Admission *admission.Controller
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(body)
+}
+
+// overloadedRetryAfterSeconds is the hint on a shed request.
+//
+// Unlike a rate limit, there is no bucket to compute an exact wait from: how
+// long until a slot frees depends on the provider, which is the thing that is
+// slow. One second is short enough to recover quickly from a brief spike and
+// long enough not to amplify a sustained one into a retry storm.
+const overloadedRetryAfterSeconds = 1
+
+// writeRetryableError writes an error envelope carrying retry guidance in
+// both the header and the body, the same way a 429 does.
+func writeRetryableError(
+	w http.ResponseWriter, r *http.Request, status int,
+	code contract.ErrorCode, message string, retryAfter int,
+) {
+	w.Header().Set("Retry-After", strconv.Itoa(retryAfter))
+	writeJSON(w, status, contract.ErrorResponse{
+		RequestID: middleware.RequestID(r.Context()),
+		Error: contract.ErrorBody{
+			Code:              code,
+			Message:           message,
+			RetryAfterSeconds: retryAfter,
+		},
+	})
 }
 
 func writeError(w http.ResponseWriter, r *http.Request, status int, code contract.ErrorCode, message string) {
@@ -122,12 +154,55 @@ func Scan(deps ScanDeps) http.Handler {
 		ctx, cancel := context.WithTimeout(r.Context(), deps.Timeout)
 		defer cancel()
 
+		// Admission is taken here rather than around the whole handler, so a
+		// request that was going to be refused for a malformed body never
+		// occupies a slot that a well-formed one could use. The scarce
+		// resource is the provider call, not the parser.
+		//
+		// The context is the one carrying the scan deadline, so a request
+		// that runs out of budget while queued gives up its place instead of
+		// waiting for a slot it could no longer use.
+		release, err := deps.Admission.Acquire(ctx)
+		if err != nil {
+			switch {
+			case errors.Is(err, admission.ErrQueueFull):
+				// Both the slots and the queue are full. A 503 now is better
+				// information than a response that may arrive in two minutes.
+				stats := deps.Admission.Stats()
+				log.Warn("scan request shed: admission queue full",
+					"request_id", requestID,
+					"active", stats.Active, "queued", stats.Queued,
+					"max_active", stats.MaxActive, "max_queued", stats.MaxQueued)
+				writeRetryableError(w, r, http.StatusServiceUnavailable,
+					contract.ErrCodeOverloaded,
+					"The service is at capacity. Retry after the interval in "+
+						"retry_after_seconds.", overloadedRetryAfterSeconds)
+			case errors.Is(err, context.DeadlineExceeded):
+				log.Warn("scan deadline exceeded while queued for admission",
+					"request_id", requestID)
+				writeError(w, r, http.StatusGatewayTimeout,
+					contract.ErrCodeDeadlineExceeded, "Scan exceeded its deadline.")
+			default:
+				// The caller hung up. Nothing useful can be written to a
+				// connection that is gone, but the status is recorded.
+				log.Info("scan abandoned while queued for admission",
+					"request_id", requestID, "reason", err.Error())
+				writeError(w, r, http.StatusServiceUnavailable,
+					contract.ErrCodeDetectorUnavailable, "Scan was not admitted.")
+			}
+			return
+		}
+
 		assessment, err := deps.Detector.Assess(ctx, detector.AssessmentRequest{
 			RequestID:  requestID,
 			TaskID:     req.TaskID,
 			Content:    req.Content,
 			DeadlineMS: int(deps.Timeout.Milliseconds()),
 		})
+		// Released as soon as the provider call returns, on every path
+		// including failure. Policy evaluation and serialisation are
+		// microseconds and do not need to hold capacity.
+		release()
 		if err != nil {
 			// Every failure below is an error envelope. None becomes an allow.
 			switch {

@@ -79,11 +79,12 @@ func Ready(readiness *Readiness) http.Handler {
 //
 // The scan route is registered only when it can be served safely: a nil
 // detector means it cannot scan, a nil caller registry means it cannot tell
-// who is asking, and a nil limiter means it cannot bound what it spends. In
-// any of those cases the route is absent and 404s, rather than existing in a
-// degraded form — a registered route that scans nothing, one that scans for
-// anybody, or one that scans without limit are all worse than a missing
-// route.
+// who is asking, a nil limiter means it cannot bound what it spends, and a nil
+// admission controller means it cannot bound what it runs at once. In any of
+// those cases the route is absent and 404s, rather than existing in a degraded
+// form — a route that scans nothing, one that scans for anybody, one that
+// scans without limit, or one that scans without bound are all worse than a
+// missing route.
 //
 // Authentication wraps the scan route alone. The health endpoints stay open
 // because a load balancer probing readiness holds no credential, and what
@@ -93,7 +94,8 @@ func NewRouter(readiness *Readiness, deps ScanDeps) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("GET /healthz", Live())
 	mux.Handle("GET /readyz", Ready(readiness))
-	if deps.Detector != nil && deps.Callers != nil && deps.Limiter != nil {
+	if deps.Detector != nil && deps.Callers != nil &&
+		deps.Limiter != nil && deps.Admission != nil {
 		// Outermost first: authenticate, then rate limit, then scan. A
 		// request refused by either middleware never reaches the parser or
 		// the detector.

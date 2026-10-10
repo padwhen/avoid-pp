@@ -22,6 +22,11 @@ services:
     environment:
       AVOIDPP_DETECTOR_MODE: fake
       AVOIDPP_DETECTOR_DETECTOR_VERSION: fake-0
+      # The detector's own concurrency bound, set above the gateway's so the
+      # gateway sheds first. A rejection here means something is calling the
+      # detector directly, which is worth surfacing.
+      AVOIDPP_DETECTOR_MAX_ACTIVE: ${AVOIDPP_DETECTOR_MAX_ACTIVE:-8}
+      AVOIDPP_DETECTOR_MAX_WAITING: ${AVOIDPP_DETECTOR_MAX_WAITING:-16}
     # Deliberately no `ports:`. Reachable at http://detector:9000 on the
     # internal network and nowhere else.
     networks:
@@ -58,6 +63,10 @@ services:
       AVOIDPP_RATE_CALLER: ${AVOIDPP_RATE_CALLER:-1/5}
       AVOIDPP_RATE_GLOBAL: ${AVOIDPP_RATE_GLOBAL:-2/10}
       AVOIDPP_RATE_UNAUTHENTICATED: ${AVOIDPP_RATE_UNAUTHENTICATED:-2/10}
+      # Concurrency, which is a different question from arrival rate: at 4.4
+      # seconds a call, two requests per second leaves roughly nine in flight.
+      AVOIDPP_MAX_ACTIVE: ${AVOIDPP_MAX_ACTIVE:-4}
+      AVOIDPP_MAX_QUEUED: ${AVOIDPP_MAX_QUEUED:-8}
       AVOIDPP_LOG_LEVEL: ${AVOIDPP_LOG_LEVEL:-info}
     ports:
       # The only thing published to the host. 8099 by default because 8080 is
