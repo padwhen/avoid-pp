@@ -5,11 +5,11 @@
 A Go/Python workspace for a prompt-injection detection API, initially evaluated
 around Finnish-to-English LLM translation.
 
-**Status: C10 — a working Go → Python → policy slice, with text preservation
-proven.** The scan endpoint reaches the detector and returns an assessment and
-a decision. The detector still matches keywords rather than understanding text
-until C13, the policy is a placeholder until C11, and no LLM provider is called
-anywhere.
+**Status: C11 — a working Go → Python → policy slice with a real evaluator.**
+The scan endpoint reaches the detector and returns an assessment and a decision
+under a configured monitoring or enforcement policy. The detector still matches
+keywords rather than understanding text until C13, and no LLM provider is
+called anywhere.
 
 Go will own the API, authentication, request limits and policy decisions. Python
 will own model integration, assessment validation and evaluation logic. The
@@ -156,6 +156,20 @@ diacritics, zero-width characters, ZWJ emoji, bidi marks, CRLF, astral-plane
 code points — are asserted unchanged across the real HTTP hop, and six
 foreign-language spans must survive under a Finnish hint. See
 [C10 acceptance criteria](docs/c10-text-preservation.md).
+
+## Policy
+
+| Mode | `no_injection_detected` | `suspicious` | `uncertain` |
+| --- | --- | --- | --- |
+| monitoring (default) | allow | flag | flag |
+| enforcement | allow | block | block |
+
+No combination produces an allow from a non-clean label. Set the mode with
+`AVOIDPP_POLICY_MODE`; an unrecognised value stops startup rather than leaving
+the gateway quietly permissive, and an unconfigured mode refuses to scan rather
+than relaxing to monitoring. The policy comes from server configuration, so a
+caller cannot choose the rules it is judged under. See
+[C11 acceptance criteria](docs/c11-policy.md).
 
 ## Running the detector
 

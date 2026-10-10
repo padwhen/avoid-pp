@@ -196,3 +196,44 @@ func TestRedactedEmptyWithoutURL(t *testing.T) {
 		t.Errorf("Redacted() = %q, want empty", got)
 	}
 }
+
+func TestLoadPolicyModeDefaultsToMonitoring(t *testing.T) {
+	cfg, err := Load(env(valid()))
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if string(cfg.PolicyMode) != DefaultPolicyMode {
+		t.Errorf("PolicyMode = %q, want %q", cfg.PolicyMode, DefaultPolicyMode)
+	}
+}
+
+func TestLoadPolicyModeAcceptsEnforcement(t *testing.T) {
+	cfg, err := Load(env(map[string]string{
+		EnvDetectorURL: "http://d:1",
+		EnvPolicyMode:  "ENFORCEMENT",
+	}))
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if string(cfg.PolicyMode) != "enforcement" {
+		t.Errorf("PolicyMode = %q, want enforcement (case-insensitive)", cfg.PolicyMode)
+	}
+}
+
+// Enforcement must be chosen deliberately. A typo must stop startup rather
+// than silently leaving the gateway in the permissive mode.
+func TestLoadRejectsUnknownPolicyMode(t *testing.T) {
+	for _, mode := range []string{"enforce", "on", "strict", "allow_all", "block"} {
+		_, err := Load(env(map[string]string{
+			EnvDetectorURL: "http://d:1",
+			EnvPolicyMode:  mode,
+		}))
+		if err == nil {
+			t.Errorf("Load() accepted policy mode %q", mode)
+			continue
+		}
+		if !strings.Contains(err.Error(), EnvPolicyMode) {
+			t.Errorf("error does not name %s: %v", EnvPolicyMode, err)
+		}
+	}
+}

@@ -31,6 +31,7 @@ import (
 	"github.com/padwhen/avoid-pp/gateway/internal/api"
 	"github.com/padwhen/avoid-pp/gateway/internal/contract"
 	"github.com/padwhen/avoid-pp/gateway/internal/detector"
+	"github.com/padwhen/avoid-pp/gateway/internal/policy"
 )
 
 // capture records what the detector actually received, byte for byte.
@@ -105,6 +106,7 @@ func newStack(t *testing.T) (http.Handler, *capture) {
 		Detector: detector.New(base, 5*time.Second),
 		Timeout:  5 * time.Second,
 		Log:      slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Mode:     policy.ModeMonitoring,
 	})
 	return router, cap
 }
