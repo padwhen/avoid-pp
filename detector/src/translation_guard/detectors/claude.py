@@ -35,6 +35,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from translation_guard import prompts
 from translation_guard.detectors.base import Detector, DetectorUnavailable
+from translation_guard.limits import Budget, InputTooLarge
+from translation_guard.limits import check as check_limits
 from translation_guard.schemas import Assessment, Category, Content, Label
 from translation_guard.validation import InvalidModelOutput, validate
 
@@ -87,7 +89,9 @@ class ClaudeDetector(Detector):
         timeout_seconds: float = 15.0,
         on_usage: Callable[[int, int], None] | None = None,
         prompt_version: str = DEFAULT_PROMPT_VERSION,
+        budget: Budget | None = None,
     ) -> None:
+        self._budget = budget or Budget()
         self._api_key = api_key
         self._model = model
         self._identity = identity
@@ -137,6 +141,14 @@ class ClaudeDetector(Detector):
     ) -> Assessment:
         if self._client is None:
             raise DetectorUnavailable("detector was not started")
+
+        # C16: bound the input before spending anything. An oversized passage
+        # is refused outright - there is no path here that trims it and then
+        # reports a complete scan.
+        try:
+            check_limits(content.text, self._budget)
+        except InputTooLarge as exc:
+            raise DetectorUnavailable(f"input rejected: {exc}") from exc
 
         request_timeout = self._timeout
         if deadline_ms is not None:

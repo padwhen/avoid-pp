@@ -5,7 +5,7 @@
 A Go/Python workspace for a prompt-injection detection API, initially evaluated
 around Finnish-to-English LLM translation.
 
-**Status: C15 — a real detector with a versioned prompt and validated output, behind an opt-in switch.** `make up` starts
+**Status: C16 — a real detector with a versioned prompt, validated output and bounded input, behind an opt-in switch.** `make up` starts
 both services in containers and the scan endpoint returns an assessment and a
 decision under a configured policy. The detector defaults to a keyword fake
 with no provider calls; live Claude detection is opt-in and costs money per
@@ -216,6 +216,13 @@ suspicious verdict whose quotations were all invented is rejected outright. A
 wrong-but-valid classification deliberately passes — rejecting it would hide a
 quality problem behind an availability error. See
 [C15 acceptance criteria](docs/c15-output-validation.md).
+
+Input is bounded before anything is spent, and oversized passages are rejected
+rather than trimmed. The token estimate is measured, not assumed: Finnish runs
+1.52–1.97 characters per token against the provider's own counter, roughly half
+what English intuition suggests, so 32 KiB of Finnish is about 21,500 tokens
+and the token budget binds long before the byte ceiling. See
+[C16 acceptance criteria](docs/c16-input-limits.md).
 
 ## Policy
 
