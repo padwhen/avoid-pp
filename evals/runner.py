@@ -35,11 +35,21 @@ import argparse
 import hashlib
 import json
 import sys
-from datetime import datetime, timezone
+from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import yaml
+from metrics import (
+    DEFAULT_CONFIDENCE,
+    GATES,
+    clopper_pearson,
+    cost_record,
+    gate_verdict,
+    percentiles,
+    slice_metrics,
+)
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_DATASET = ROOT / "datasets" / "seed-fi.yaml"
@@ -209,16 +219,33 @@ def metrics(counts: dict[str, int]) -> dict[str, Any]:
     answered = tp + fn + fp + tn
     scored = attacks + benign
 
+    # Every rate carries an exact interval. A point estimate of 1.0 from 23
+    # cases and one from 2,300 are the same number and completely different
+    # evidence, and only the interval says which you have.
+    recall = clopper_pearson(tp, tp + fn)
+    fpr = clopper_pearson(fp, fp + tn)
+    precision = clopper_pearson(tp, tp + fp)
+
     return {
         "scored_cases": scored,
         "attacks": attacks,
         "benign": benign,
+        "confidence": DEFAULT_CONFIDENCE,
         # Accuracy GIVEN the detector answered. Excludes abstentions and errors.
         "conditional": {
             "answered_cases": answered,
             "recall": ratio(tp, tp + fn),
             "false_positive_rate": ratio(fp, fp + tn),
             "precision": ratio(tp, tp + fp),
+            # The same three with bounds. Kept alongside the point estimates
+            # rather than replacing them, so existing readers of this report
+            # still work and the honest number is right next to the flattering
+            # one.
+            "intervals": {
+                "recall": recall.as_dict(),
+                "false_positive_rate": fpr.as_dict(),
+                "precision": precision.as_dict(),
+            },
         },
         # What the application actually experiences. Every case counts.
         "operational": {
@@ -226,34 +253,86 @@ def metrics(counts: dict[str, int]) -> dict[str, Any]:
             "benign_passed_rate": ratio(tn, benign),
             "uncertainty_rate": ratio(unc_a + unc_b, scored),
             "error_rate": ratio(err_a + err_b, scored),
+            "intervals": {
+                "attack_caught_rate": clopper_pearson(tp, attacks).as_dict(),
+                "benign_passed_rate": clopper_pearson(tn, benign).as_dict(),
+            },
         },
+        # Decided from the bounds, never from the point estimates. At this
+        # corpus size both gates are undetermined even for a perfect run, and
+        # the report says so rather than reporting 1.0 and 0.0 as a pass.
+        "gates": [
+            gate_verdict("recall", recall),
+            gate_verdict("false_positive_rate", fpr),
+        ],
     }
 
 
+def config_digest(parts: dict[str, Any]) -> str:
+    """A hash over everything that could change a result.
+
+    A report says what a detector scored. Without a fingerprint of the model,
+    the prompt, the dataset and the scoring configuration, it does not say
+    *which* detector - and two reports that disagree become impossible to
+    explain. Sorted keys so the digest is stable across runs.
+
+    Deliberately **not** a run identifier. It covers the setup, not the
+    outcome or the number of cases run, so two reports sharing a digest are
+    comparable: the same configuration measured twice, or measured over more
+    data. A partial run records its own case count separately rather than
+    changing this digest, because "same setup, more evidence" is exactly the
+    comparison the digest exists to make safe.
+    """
+    canonical = json.dumps(parts, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def build_report(
-    dataset: Path, detector_identity: str, counts: dict[str, int], per_case, deferred
+    dataset: Path,
+    detector_identity: str,
+    counts: dict[str, int],
+    per_case,
+    deferred,
+    *,
+    prompt_version: str = "none",
+    prompt_fingerprint: str | None = None,
+    model: str | None = None,
+    latencies_ms: list[float] | None = None,
+    usage: list[tuple[int | None, int | None]] | None = None,
+    prices: dict[str, dict[str, Any]] | None = None,
+    config_version: str = "c25-runner-1",
 ) -> dict[str, Any]:
     """Build the report.
 
     ``detector_identity`` is recorded verbatim. It used to be prefixed with
     "fake:" here, which silently labelled the first live run as fake - an
     evaluation record that misattributes what produced it is worse than none.
+
+    Quality, latency and cost are three separate blocks because they fail
+    independently: a run can be accurate and unaffordable, or fast and wrong,
+    and a single summary number would hide either.
     """
-    return {
-        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    dataset_sha = dataset_digest(dataset)
+
+    report: dict[str, Any] = {
+        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "dataset": {
             "path": dataset_label(dataset),
-            "sha256": dataset_digest(dataset),
+            "sha256": dataset_sha,
             "scored_cases": len(per_case),
             "deferred_quality_cases": len(deferred),
         },
         "detector": {
             "identity": detector_identity,
-            "prompt_version": "none",
-            "config_version": "c06-runner-1",
+            "prompt_version": prompt_version,
+            "config_version": config_version,
         },
         "counts": counts,
         "metrics": metrics(counts),
+        # Per-category, because aggregates hide the distinction this project
+        # is about: obeying every quoted attack while catching every bare
+        # imperative can look respectable overall.
+        "slices": slice_metrics(per_case),
         # Reported apart from every headline number. Detection quality on
         # embedded foreign-language spans is unverified and not claimed.
         "deferred_quality": {
@@ -266,6 +345,36 @@ def build_report(
         },
         "per_case": per_case,
     }
+
+    if prompt_fingerprint:
+        report["detector"]["prompt_fingerprint"] = prompt_fingerprint
+    if model:
+        report["detector"]["model"] = model
+
+    # Latency, separate from quality. Absent rather than empty when there was
+    # nothing to measure: a fake detector has no meaningful latency, and
+    # reporting 0 ms would invite comparison with a real one.
+    if latencies_ms:
+        report["latency"] = percentiles(latencies_ms)
+
+    # Cost, separate again. Only when provider calls were actually made.
+    if usage is not None:
+        report["cost"] = cost_record(model or detector_identity, usage, prices or {})
+
+    # The fingerprint goes last, over everything that could change a result.
+    report["config_sha256"] = config_digest(
+        {
+            "dataset_sha256": dataset_sha,
+            "detector_identity": detector_identity,
+            "model": model,
+            "prompt_version": prompt_version,
+            "prompt_fingerprint": prompt_fingerprint,
+            "config_version": config_version,
+            "confidence": DEFAULT_CONFIDENCE,
+            "gates": GATES,
+        }
+    )
+    return report
 
 
 def print_summary(report: dict[str, Any]) -> None:
@@ -283,17 +392,104 @@ def print_summary(report: dict[str, Any]) -> None:
         f"uncertain {c['uncertain_on_attack'] + c['uncertain_on_benign']}  "
         f"error {c['error_on_attack'] + c['error_on_benign']}"
     )
+
     cond, oper = m["conditional"], m["operational"]
+
+    def with_bounds(name: str, block: dict[str, Any]) -> str:
+        """Render a rate next to its interval.
+
+        Printing the point estimate alone is what makes a perfect run on
+        twenty-three cases look like a finished product.
+        """
+        interval = block["intervals"].get(name)
+        point = block.get(name)
+        if point is None:
+            return f"{name} n/a"
+        if not interval or interval["lower"] is None:
+            return f"{name} {point}"
+        return f"{name} {point} [{interval['lower']:.3f}, {interval['upper']:.3f}]"
+
     print(
-        f"  conditional : recall {cond['recall']}  "
-        f"fpr {cond['false_positive_rate']}  precision {cond['precision']} "
-        f"(over {cond['answered_cases']} answered)"
+        f"  conditional ({cond['answered_cases']} answered, "
+        f"{m['confidence']:.0%} intervals):"
     )
-    print(
-        f"  operational : caught {oper['attack_caught_rate']}  "
-        f"passed {oper['benign_passed_rate']}  "
-        f"uncertainty {oper['uncertainty_rate']}  error {oper['error_rate']}"
-    )
+    for name in ("recall", "false_positive_rate", "precision"):
+        print(f"      {with_bounds(name, cond)}")
+    print("  operational (every scored case):")
+    for name in ("attack_caught_rate", "benign_passed_rate"):
+        print(f"      {with_bounds(name, oper)}")
+    print(f"      uncertainty {oper['uncertainty_rate']}  error {oper['error_rate']}")
+
+    # The headline. A perfect score that cannot demonstrate the gate must not
+    # read as a pass, and this is the line that says so.
+    print("  gates:")
+    for gate in m["gates"]:
+        marker = {
+            "met": "MET",
+            "not_met": "NOT MET",
+            "undetermined": "UNDETERMINED",
+            "no_data": "NO DATA",
+        }[gate["verdict"]]
+        comparison = ">=" if gate["direction"] == "at_least" else "<="
+        print(
+            f"      {marker:<13} {gate['gate']} {comparison} {gate['threshold']}  "
+            f"(observed {gate['observed']}, bound {gate['bound']}, "
+            f"n={gate['trials']})"
+        )
+        if "because" in gate:
+            print(f"                    {gate['because']}")
+
+    if "slices" in report:
+        print("  slices:")
+        for category, bucket in report["slices"].items():
+            accuracy = bucket["accuracy"]
+            bounds = (
+                f"[{accuracy['lower']:.2f}, {accuracy['upper']:.2f}]"
+                if accuracy["lower"] is not None
+                else "n/a"
+            )
+            print(
+                f"      {category:<20} {bucket['correct']}/{bucket['cases']} "
+                f"correct {bounds}"
+                + (f"  wrong {bucket['wrong']}" if bucket["wrong"] else "")
+                + (f"  uncertain {bucket['uncertain']}" if bucket["uncertain"] else "")
+                + (f"  error {bucket['error']}" if bucket["error"] else "")
+            )
+
+    if "latency" in report:
+        lat = report["latency"]
+        print(
+            f"  latency     : p50 {lat['p50_ms']}ms  p90 {lat['p90_ms']}ms  "
+            f"p95 {lat['p95_ms']}ms  max {lat['max_ms']}ms "
+            f"(n={lat['samples']})"
+        )
+        if "note" in lat:
+            print(f"                {lat['note']}")
+
+    if "cost" in report:
+        cost = report["cost"]
+        line = (
+            f"  cost        : {cost['requests']} requests, "
+            f"{cost['input_tokens']} in / {cost['output_tokens']} out"
+        )
+        if cost.get("usd") is not None:
+            line += f", ${cost['usd']}"
+            if cost.get("usd_is_a_floor"):
+                line += " (a floor)"
+        else:
+            line += ", cost unknown"
+        print(line)
+        if cost.get("requests_without_usage"):
+            print(f"                {cost['unmeasured_note']}")
+        elif isinstance(cost.get("price_assumption"), dict):
+            price = cost["price_assumption"]
+            print(
+                f"                prices as of {price['as_of']}: "
+                f"${price['input_usd_per_mtok']}/Mtok in, "
+                f"${price['output_usd_per_mtok']}/Mtok out"
+            )
+
+    print(f"  config      : {report['config_sha256'][:16]}...")
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -506,6 +506,51 @@ truncated responses nobody connects to shutdown.
 
 See [C24 acceptance criteria](docs/c24-resilience.md).
 
+## Evaluation reports
+
+Quality, latency and cost in three separate blocks, because they fail
+independently: a run can be accurate and unaffordable, or fast and wrong.
+
+The live run over the full seed corpus scores **68 out of 68**. Both release
+gates are still **undetermined**, and the report says so:
+
+```text
+gates:
+    UNDETERMINED  recall >= 0.9  (observed 1.0, bound 0.851815, n=23)
+                  a perfect run would need at least 36 cases
+    UNDETERMINED  false_positive_rate <= 0.01  (observed 0.0, bound 0.078705, n=45)
+                  a perfect run would need at least 368 cases
+```
+
+A perfect score on 23 attack cases supports a recall lower bound of 85.2%, not
+100%. A perfect score on 45 benign cases is consistent with an eightfold
+breach of a 1% false-positive target. Gates are therefore decided from the
+bound and never from the point estimate — a point estimate reports "met" for a
+perfect run of any size, which is how an unmeasurable gate comes to look
+satisfied.
+
+Intervals are Clopper-Pearson, computed by exact binomial summation and
+bisection rather than by adding a scipy dependency, and checked against eight
+published values.
+
+Slices matter as much as the headline. The naive keyword detector, which is in
+the repository to demonstrate the failure this project is about:
+
+```text
+quoted_attack        5/10 correct [0.19, 0.81]  wrong 5
+ordinary             20/20 correct [0.83, 1.00]
+```
+
+Perfect on ordinary Finnish, half right on quoted attacks — it cannot tell a
+quoted attack from an obeyed one, which is the entire distinction.
+
+Cost records are dated, and **missing usage is not free**: a provider that
+reports no tokens did not charge nothing, so unreported calls are counted and
+the dollar figure is marked as a floor. `evals/reanalyse.py` re-derives
+metrics from a saved report's measurements, which is why prices carry a date.
+
+See [C25 acceptance criteria](docs/c25-eval-metrics.md).
+
 ## Running the detector
 
 ```sh

@@ -33,9 +33,10 @@ from runner import (  # noqa: E402
     print_summary,
     score,
 )
+
+from translation_guard import prompts  # noqa: E402
 from translation_guard.config import Settings  # noqa: E402
 from translation_guard.detectors.base import DetectorUnavailable  # noqa: E402
-from translation_guard import prompts  # noqa: E402
 from translation_guard.detectors.claude import ClaudeDetector  # noqa: E402
 from translation_guard.schemas import Content, SourceType  # noqa: E402
 
@@ -53,16 +54,24 @@ PRICING = {
 
 async def assess_all(
     cases: list[dict], model: str, concurrency: int
-) -> tuple[dict[str, str], list[tuple[int, int]], float]:
-    """Return {case_id: label-or-"error"}, token usage, and wall-clock seconds."""
+) -> tuple[dict[str, str], list[tuple[int | None, int | None]], list[float], float]:
+    """Return labels, token usage, per-case latencies, and wall-clock seconds.
+
+    Usage is collected per assessment rather than summed, so a call that
+    reported nothing stays visible as a gap. Summing would turn an unmeasured
+    call into a free one.
+    """
     settings = Settings()
-    usage: list[tuple[int, int]] = []
+    usage: list[tuple[int | None, int | None]] = []
+    latencies: list[float] = []
 
     detector = ClaudeDetector(
         api_key=settings.api_key,
         model=model,
         identity=f"claude:{model}",
         timeout_seconds=60.0,
+        # Recorded even when a field is missing, so the report can say how
+        # many calls went unmeasured instead of treating them as free.
         on_usage=lambda i, o: usage.append((i, o)),
     )
     await detector.start()
@@ -88,6 +97,11 @@ async def assess_all(
                     deadline_ms=60_000,
                 )
                 results[case_id] = assessment.label.value
+                # The detector's own measurement, not the wall clock here,
+                # which would include queueing behind the semaphore.
+                diagnostics = getattr(detector, "last_diagnostics", None)
+                if diagnostics is not None and diagnostics.latency_ms is not None:
+                    latencies.append(float(diagnostics.latency_ms))
             except DetectorUnavailable as exc:
                 # An operational failure is its own outcome, never a clean one.
                 results[case_id] = "error"
@@ -106,20 +120,13 @@ async def assess_all(
     finally:
         await detector.stop()
 
-    return results, usage, time.monotonic() - started
+    return results, usage, latencies, time.monotonic() - started
 
 
-def cost_of(model: str, usage: list[tuple[int, int]]) -> dict:
-    inp = sum(i for i, _ in usage)
-    out = sum(o for _, o in usage)
-    price = PRICING.get(model)
-    block = {"input_tokens": inp, "output_tokens": out, "requests": len(usage)}
-    if price:
-        block["usd"] = round(
-            inp / 1e6 * price["input"] + out / 1e6 * price["output"], 4
-        )
-        block["price_as_of"] = price["as_of"]
-    return block
+# cost_of lived here until C25. It summed usage into a single figure, which
+# meant a call that reported no tokens was indistinguishable from a free one.
+# metrics.cost_record counts unmeasured calls separately and marks the dollar
+# figure as a floor when there were any.
 
 
 def main() -> int:
@@ -150,7 +157,9 @@ def main() -> int:
         return 1
 
     print(f"live-eval: {model}, {len(cases)} cases, concurrency {args.concurrency}\n")
-    labels, usage, elapsed = asyncio.run(assess_all(cases, model, args.concurrency))
+    labels, usage, latencies, elapsed = asyncio.run(
+        assess_all(cases, model, args.concurrency)
+    )
 
     # Hand the precomputed labels to the tested scorer. An adapter that raises
     # for "error" lets runner.py classify it as an operational failure exactly
@@ -162,29 +171,50 @@ def main() -> int:
         return label
 
     result, per_case = score(cases, adapter)
-    report = build_report(
-        DATASET, f"claude:{model}", result["counts"], per_case, result["deferred"]
-    )
     prompt = prompts.get(prompts.DEFAULT_VERSION)
-    report["detector"]["prompt_version"] = prompt.version
-    # The hash makes the report self-verifying: a number is a claim about
-    # exact prompt bytes, and a name alone cannot prove which bytes ran.
-    report["detector"]["prompt_fingerprint"] = prompt.fingerprint()
-    report["cost"] = cost_of(model, usage)
+
+    # Quality, latency and cost are passed in separately and reported
+    # separately: a run can be accurate and unaffordable, or fast and wrong,
+    # and one summary number would hide either.
+    report = build_report(
+        DATASET,
+        f"claude:{model}",
+        result["counts"],
+        per_case,
+        result["deferred"],
+        # The fingerprint makes the report self-verifying: a version name
+        # cannot prove which prompt bytes ran, and a hash can.
+        prompt_version=prompt.version,
+        prompt_fingerprint=prompt.fingerprint(),
+        model=model,
+        latencies_ms=latencies,
+        usage=usage,
+        prices=PRICING,
+    )
     report["wall_clock_seconds"] = round(elapsed, 1)
+    if args.limit:
+        # Stated in the report as well as the filename, because a file gets
+        # renamed and copied and its name stops being evidence.
+        report["dataset"]["partial_run"] = {
+            "cases_run": len(cases),
+            "note": (
+                f"Only the first {len(cases)} cases of the dataset were run. "
+                "Metrics describe this subset, not the corpus, and the "
+                "dataset digest is of the whole file."
+            ),
+        }
 
     REPORTS.mkdir(parents=True, exist_ok=True)
-    out = REPORTS / f"live-{model}.json"
+    # A limited run must not overwrite a full one. The first version of this
+    # wrote both to the same path, so a ten-case subset silently replaced a
+    # seventy-three-case corpus report - the file still claimed to be "the"
+    # live report for the model, with a tenth of the evidence behind it.
+    suffix = f"-first{len(cases)}" if args.limit else ""
+    out = REPORTS / f"live-{model}{suffix}.json"
     out.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 
     print()
     print_summary(report)
-    cost = report["cost"]
-    print(
-        f"  cost        : {cost['requests']} requests, "
-        f"{cost['input_tokens']} in / {cost['output_tokens']} out"
-        + (f", ${cost['usd']}" if "usd" in cost else "")
-    )
     print(f"  wall clock  : {report['wall_clock_seconds']}s")
     print(f"\nreport written to {out}")
     return 0

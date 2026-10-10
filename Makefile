@@ -64,8 +64,8 @@ check-go:
 	cd gateway && $(GO) test -race ./...
 
 check-python:
-	cd detector && $(UV) run --locked --no-sync ruff format --check .
-	cd detector && $(UV) run --locked --no-sync ruff check .
+	cd detector && $(UV) run --locked --no-sync ruff format --check . ../evals ../scripts
+	cd detector && $(UV) run --locked --no-sync ruff check . ../evals ../scripts
 	cd detector && $(UV) run --locked --no-sync mypy src
 	cd detector && $(UV) run --locked --no-sync python -m pytest tests -q
 	cd detector && $(UV) run --locked --no-sync python -c "import translation_guard"

@@ -99,7 +99,9 @@ async def run(model: str) -> int:
                 mismatches += 1
 
             quote = assessment.evidence[0].quote if assessment.evidence else "-"
-            print(f"  {mark}  {name:<16} {label:<22} {elapsed:>5}ms  quote: {quote[:48]}")
+            print(
+                f"  {mark}  {name:<16} {label:<22} {elapsed:>5}ms  quote: {quote[:48]}"
+            )
 
             # Every quote must be verbatim from the passage it cites.
             for item in assessment.evidence:
@@ -122,7 +124,9 @@ async def run(model: str) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--confirm", action="store_true", help="actually call the provider")
+    parser.add_argument(
+        "--confirm", action="store_true", help="actually call the provider"
+    )
     parser.add_argument("--model", default=None, help="override the configured model")
     args = parser.parse_args()
 
