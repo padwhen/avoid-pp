@@ -6,21 +6,24 @@ UV ?= uv
 # another service (nginx, for one), so the convenience target uses 8099.
 ADDR ?= :8099
 DETECTOR_URL ?= http://localhost:9000
+DETECTOR_HOST ?= 127.0.0.1
+DETECTOR_PORT ?= 9000
 
 .DEFAULT_GOAL := help
-.PHONY: help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner run-gateway
+.PHONY: help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner run-gateway run-detector
 
 help:
 	@printf '%s\n' \
 	  'make bootstrap     Resolve Go modules and install locked Python dependencies' \
 	  'make check         Check both language workspaces (run bootstrap first)' \
 	  'make check-go      Check Go formatting, vet, and run tests under -race' \
-	  'make check-python Check Python formatting, lint, types and package import' \
+	  'make check-python Check Python formatting, lint, types, tests and package import' \
 	  'make check-contracts  Validate contract schemas against positive/negative fixtures' \
 	  'make check-contracts-selftest  Prove the contract validator rejects bad data' \
 	  'make check-evals      Validate the Finnish seed dataset and report progress' \
 	  'make check-evals-runner  Assert the evaluation runner against a hand-calculated fixture' \
-	  'make run-gateway   Run the gateway locally (override ADDR= and DETECTOR_URL=)'
+	  'make run-gateway   Run the gateway locally (override ADDR= and DETECTOR_URL=)' \
+	  'make run-detector  Run the detector locally in fake mode (no API key)'
 
 bootstrap: bootstrap-go bootstrap-python
 
@@ -44,6 +47,7 @@ check-python:
 	cd detector && $(UV) run --locked --no-sync ruff format --check .
 	cd detector && $(UV) run --locked --no-sync ruff check .
 	cd detector && $(UV) run --locked --no-sync mypy src
+	cd detector && $(UV) run --locked --no-sync python -m pytest tests -q
 	cd detector && $(UV) run --locked --no-sync python -c "import translation_guard"
 
 check-contracts:
@@ -60,3 +64,7 @@ check-evals-runner:
 
 run-gateway:
 	cd gateway && AVOIDPP_ADDR=$(ADDR) AVOIDPP_DETECTOR_URL=$(DETECTOR_URL) $(GO) run ./cmd/server
+
+run-detector:
+	cd detector && $(UV) run --locked --no-sync uvicorn translation_guard.api:app \
+	  --host $(DETECTOR_HOST) --port $(DETECTOR_PORT)
