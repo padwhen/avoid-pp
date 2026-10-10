@@ -364,3 +364,70 @@ async def test_a_schema_violation_is_not_retried():
     with pytest.raises(DetectorUnavailable):
         await detector_with(messages, attempts=5).assess(content())
     assert len(messages.calls) == 1
+
+
+# ---------------------------------------------------------------------------
+# A 400 that is really a billing problem.
+# ---------------------------------------------------------------------------
+
+
+def test_account_problems_are_named_not_reported_as_a_bare_400():
+    """A generic "provider returned 400" sent an investigation the wrong way.
+
+    436 consecutive evaluation cases failed with that message. The cause was
+    an empty account, and nothing in the message suggested it - the generic
+    400 pointed at the request shape instead of at the billing page.
+    """
+    from translation_guard.detectors.claude import _permanent_reason
+
+    class FakeStatusError(Exception):
+        pass
+
+    cases = {
+        "Your credit balance is too low to access the Anthropic API.": "provider credit balance exhausted",
+        "There is a billing issue with this organization.": "provider billing problem",
+        "Monthly quota exceeded for this workspace.": "provider quota exhausted",
+    }
+    for message, expected in cases.items():
+        assert _permanent_reason(400, FakeStatusError(message)) == expected
+
+    # Anything else stays generic, because guessing would be worse than a
+    # coarse answer.
+    assert (
+        _permanent_reason(400, FakeStatusError("messages.0.content: invalid"))
+        == "provider returned 400"
+    )
+    assert (
+        _permanent_reason(403, FakeStatusError("forbidden")) == "provider returned 403"
+    )
+    assert (
+        _permanent_reason(422, FakeStatusError("unprocessable"))
+        == "provider returned 422"
+    )
+
+
+def test_the_reason_never_echoes_the_provider_message():
+    """The match is read and discarded.
+
+    A 400 body is exactly where a provider echoes the request back, which is
+    the leak C23 closed. So the substring is matched and the string returned
+    is ours.
+    """
+    from translation_guard.detectors.claude import _permanent_reason
+
+    class FakeStatusError(Exception):
+        pass
+
+    canary = "CANARY-PASSAGE-4d1e"
+    leaky = (
+        f"400 - credit balance is too low. request: "
+        f"{{'messages': [{{'content': '{canary}'}}]}}"
+    )
+    reason = _permanent_reason(400, FakeStatusError(leaky))
+    assert canary not in reason
+    assert reason == "provider credit balance exhausted"
+
+    # And for an unrecognised 400, where the message is not consulted at all
+    # beyond the substring check.
+    reason = _permanent_reason(400, FakeStatusError(f"something odd: {canary}"))
+    assert canary not in reason
