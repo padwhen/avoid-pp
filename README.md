@@ -5,11 +5,10 @@
 A Go/Python workspace for a prompt-injection detection API, initially evaluated
 around Finnish-to-English LLM translation.
 
-**Status: C07 — contract, evaluation harness and a running Go gateway.** The
-gateway serves health endpoints only: there is no scan endpoint, detector,
-translation service or security protection yet. The contract is frozen and the
-evaluation harness runs against fake detectors, both ahead of the services that
-will implement them.
+**Status: C08 — contract, evaluation harness, a Go gateway and a Python
+detector.** Both services run, but nothing connects them yet: the gateway has
+no scan endpoint until C09, and the detector matches keywords rather than
+understanding text until C13. No LLM provider is called anywhere.
 
 Go will own the API, authentication, request limits and policy decisions. Python
 will own model integration, assessment validation and evaluation logic. The
@@ -131,6 +130,26 @@ name the variable and the requirement, never the value, because configuration
 carries credentials. Ctrl-C drains in-flight requests within
 `AVOIDPP_SHUTDOWN_TIMEOUT` rather than cutting them off. See
 [C07 acceptance criteria](docs/c07-gateway.md).
+
+## Running the detector
+
+```sh
+make run-detector    # 127.0.0.1:9000, fake mode, no API key
+
+curl -s localhost:9000/readyz
+curl -s -X POST localhost:9000/internal/v1/assessments \
+  -H 'Content-Type: application/json' \
+  -d @contracts/fixtures/valid/assessment-request.finnish-with-embedded-dutch.json
+```
+
+Private by construction: the gateway reaches it over an internal network and it
+is never published to the host once Compose arrives at C12.
+
+The fake detector matches marker substrings. That is deliberately not a
+detection strategy — C06 scores exactly this approach at recall 0.22 with half
+the quoted attacks falsely flagged. It exists to exercise the plumbing
+deterministically and for free. See
+[C08 acceptance criteria](docs/c08-detector.md).
 
 ## API contract
 
