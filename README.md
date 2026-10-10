@@ -5,10 +5,11 @@
 A Go/Python workspace for a prompt-injection detection API, initially evaluated
 around Finnish-to-English LLM translation.
 
-**Status: C09 — a working Go → Python → policy slice.** `POST /v1/scans`
-reaches the detector and returns an assessment and a decision. The detector
-still matches keywords rather than understanding text until C13, the policy is
-a placeholder until C11, and no LLM provider is called anywhere.
+**Status: C10 — a working Go → Python → policy slice, with text preservation
+proven.** The scan endpoint reaches the detector and returns an assessment and
+a decision. The detector still matches keywords rather than understanding text
+until C13, the policy is a placeholder until C11, and no LLM provider is called
+anywhere.
 
 Go will own the API, authentication, request limits and policy decisions. Python
 will own model integration, assessment validation and evaluation logic. The
@@ -146,8 +147,15 @@ curl -s -X POST localhost:8099/v1/scans \
 
 A request crosses Go → Python → back, and the response carries an assessment,
 a decision, byte coverage and the versions that produced it. Stop the detector
-and the same request returns `503 detector_unavailable` — never an allow. See
-[C09 acceptance criteria](docs/c09-scan-wiring.md).
+and the same request returns a 503 detector-unavailable error, never an allow.
+See [C09 acceptance criteria](docs/c09-scan-wiring.md).
+
+The passage reaches the detector byte for byte, and the language hint cannot
+change that. Fifteen passages chosen to break careless pipelines — combining
+diacritics, zero-width characters, ZWJ emoji, bidi marks, CRLF, astral-plane
+code points — are asserted unchanged across the real HTTP hop, and six
+foreign-language spans must survive under a Finnish hint. See
+[C10 acceptance criteria](docs/c10-text-preservation.md).
 
 ## Running the detector
 
