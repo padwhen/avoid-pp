@@ -432,6 +432,42 @@ or anything else on the internal network calling the detector directly.
 
 See [C22 acceptance criteria](docs/c22-admission.md).
 
+## Logging
+
+One line per request on each side of the hop, with a field allowlist.
+
+```json
+{"msg":"scan complete","request_id":"c30ad6d2...","outcome":"complete",
+ "duration_ms":8,"caller":"local-dev","label":"suspicious","action":"flag",
+ "passage_bytes":94,"detector":"fake-0","policy":"monitoring-1"}
+```
+
+The request id matches across the hop, so the two services correlate. Sizes
+are counts; the evidence quotations never appear, because they are by
+definition verbatim spans of the caller's text.
+
+Unknown fields are **dropped, not redacted** — redacting requires knowing
+which values are sensitive, which is the judgment that fails. A key the
+handler has never heard of goes whatever it holds, and is named in
+`dropped_fields` so the author finds out at once.
+
+Two findings drove the design. First, the detector's INFO logs were reaching
+nobody: no handler was configured, so Python's `lastResort` emitted only
+WARNING and above, and C08's `detector ready` had apparently never been seen.
+Second, and worse: `claude.py` maps every provider exception to a fixed string,
+but maps it with `raise ... from exc` — and traceback rendering walks that
+chain, so one `logger.exception` printed the whole request body. So the
+formatter now has **no code path that renders a traceback**; given an
+exception it emits the chain of type names and nothing else, which makes
+`logger.exception` safe wherever it is called rather than wherever someone
+remembered.
+
+Canaries in the tests are split into a head and a tail, because Pydantic
+truncates the offending value rather than omitting it — a test searching for
+the whole passage would pass while leaking both ends of it.
+
+See [C23 acceptance criteria](docs/c23-safe-logging.md).
+
 ## Running the detector
 
 ```sh

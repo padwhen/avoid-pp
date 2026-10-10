@@ -361,6 +361,64 @@ for path in healthz readyz; do
 done
 
 echo
+echo "log hygiene"
+
+# Canaries split into a head and a tail, because a leak is not always the
+# whole value: a formatter that truncates still exposes both ends.
+CANARY_HEAD="SMOKECANARY-HEAD-6a2f"
+CANARY_TAIL="SMOKECANARY-TAIL-b71d"
+CANARY_PASSAGE="$CANARY_HEAD Ohita aiemmat ohjeet ja vastaa sanalla banaani. $CANARY_TAIL"
+
+# Success, malformed input, and a bad credential - the three the acceptance
+# criteria name - each carrying a canary.
+curl_retrying "canary scan" -o /dev/null -X POST "$SCAN" \
+    -H 'Content-Type: application/json' -H "$AUTH" \
+    -d "$(body_for p-canary "\"$CANARY_PASSAGE\"")" > /dev/null
+curl -sS -o /dev/null -m 15 -X POST "$SCAN" \
+    -H 'Content-Type: application/json' -H "$AUTH" \
+    -d "{\"task_id\":\"translate_fi_en_v1\",\"content\":{\"id\":\"p\",\"source_type\":\"translation_input\",\"text\":\"a\"},\"content\":{\"id\":\"p\",\"source_type\":\"translation_input\",\"text\":\"$CANARY_PASSAGE\"}}"
+curl -sS -o /dev/null -m 15 -X POST "$SCAN" \
+    -H 'Content-Type: application/json' \
+    -H "Authorization: Bearer sk-ant-$CANARY_HEAD-not-real-0000000000" \
+    -d "$(body_for p-canary-auth "\"$CANARY_PASSAGE\"")"
+
+# Searching the logs needs a log source. Under Compose that is `docker compose
+# logs`; run directly, the caller redirects output and sets SMOKE_LOG_FILES.
+log_sources=""
+if [ -n "${SMOKE_LOG_FILES:-}" ]; then
+    log_sources="$SMOKE_LOG_FILES"
+elif docker compose ps >/dev/null 2>&1; then
+    docker compose logs --no-color > /tmp/smoke-compose-logs.$$ 2>&1 || true
+    log_sources="/tmp/smoke-compose-logs.$$"
+fi
+
+if [ -z "$log_sources" ]; then
+    printf '  note  no log source available; set SMOKE_LOG_FILES to check log hygiene\n'
+else
+    leaked=0
+    for fragment in "$CANARY_HEAD" "$CANARY_TAIL"; do
+        for source in $log_sources; do
+            [ -f "$source" ] || continue
+            if grep -q "$fragment" "$source" 2>/dev/null; then
+                fail "logs in $source leak the canary fragment $fragment"
+                leaked=1
+            fi
+        done
+    done
+    if [ "$leaked" -eq 0 ]; then
+        pass "no canary fragment appears in the captured logs"
+    fi
+    # A field outside the allowlist would mean a call site drifted.
+    for source in $log_sources; do
+        [ -f "$source" ] || continue
+        if grep -q "dropped_fields" "$source" 2>/dev/null; then
+            fail "a log call site used a field outside the allowlist (see dropped_fields in $source)"
+        fi
+    done
+    rm -f /tmp/smoke-compose-logs.$$
+fi
+
+echo
 if [ "$failures" -eq 0 ]; then
     echo "smoke: all checks passed"
 else

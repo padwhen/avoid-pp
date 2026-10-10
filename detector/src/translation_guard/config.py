@@ -60,6 +60,10 @@ class Settings(BaseSettings):
     # Per-request ceiling. The gateway's deadline still wins when it is lower.
     request_timeout_seconds: float = Field(default=15.0, gt=0, le=120)
 
+    # Log level for this service's own logger. uvicorn's access log is
+    # separate and left alone.
+    log_level: str = Field(default="INFO", pattern=r"^(?i:debug|info|warning|error)$")
+
     # Concurrency bound, defence in depth behind the gateway's own.
     #
     # Set above the gateway's default of 4 on purpose: in normal operation the

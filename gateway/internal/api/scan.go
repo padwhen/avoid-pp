@@ -98,6 +98,23 @@ func Scan(deps ScanDeps) http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestID := middleware.RequestID(r.Context())
+		started := time.Now()
+
+		// One line per request, whatever the outcome. The fields are the ones
+		// a routine failure is diagnosed from: which request, what happened,
+		// how long it took, how big the passage was, and what produced the
+		// answer. Sizes are counts; none of this is passage text.
+		//
+		// The handler's logger goes through the allowlisting handler, so a
+		// field added here that is not on the list is dropped and named
+		// rather than emitted.
+		outcome := func(name string, attrs ...any) {
+			log.Info("scan "+name, append([]any{
+				"request_id", requestID,
+				"outcome", name,
+				"duration_ms", time.Since(started).Milliseconds(),
+			}, attrs...)...)
+		}
 
 		req, err := decodeScanRequest(w, r)
 		if err != nil {
@@ -107,16 +124,17 @@ func Scan(deps ScanDeps) http.Handler {
 				// They are different strings on purpose: parser errors embed
 				// the offending input, and echoing that back would turn an
 				// error response into a reflection channel.
-				log.Info("scan request rejected",
-					"request_id", requestID,
+				outcome("rejected",
 					"status", failure.status,
 					"code", string(failure.code),
+					// The reason is developer-written and names the structural
+					// problem; it never contains the offending input, which is
+					// why decode.go builds it separately from the message.
 					"reason", failure.reason)
 				writeError(w, r, failure.status, failure.code, failure.message)
 				return
 			}
-			log.Error("scan request could not be decoded",
-				"request_id", requestID, "error", err)
+			outcome("decode_error", "error", err)
 			writeError(w, r, http.StatusBadRequest,
 				contract.ErrCodeMalformedJSON, "Request body is not valid JSON for this schema.")
 			return
@@ -134,8 +152,7 @@ func Scan(deps ScanDeps) http.Handler {
 		// the middleware must fail loudly, not serve unauthenticated scans.
 		caller, authenticated := auth.CallerFrom(r.Context())
 		if !authenticated {
-			log.Error("scan handler reached without authentication",
-				"request_id", requestID)
+			outcome("unauthenticated")
 			writeError(w, r, http.StatusUnauthorized,
 				contract.ErrCodeUnauthenticated, "Valid credentials are required.")
 			return
@@ -143,8 +160,8 @@ func Scan(deps ScanDeps) http.Handler {
 		if !caller.MayUse(req.TaskID) {
 			// The caller is known, so naming the task it asked for discloses
 			// nothing it did not already send.
-			log.Warn("scan request rejected: task not permitted",
-				"request_id", requestID, "caller", caller.Name, "task_id", req.TaskID)
+			outcome("unauthorized_task",
+				"caller", caller.Name, "task_id", string(req.TaskID))
 			writeError(w, r, http.StatusForbidden,
 				contract.ErrCodeUnauthorizedTask,
 				"This caller is not authorized for the requested task.")
@@ -169,8 +186,8 @@ func Scan(deps ScanDeps) http.Handler {
 				// Both the slots and the queue are full. A 503 now is better
 				// information than a response that may arrive in two minutes.
 				stats := deps.Admission.Stats()
-				log.Warn("scan request shed: admission queue full",
-					"request_id", requestID,
+				outcome("shed",
+					"error", err,
 					"active", stats.Active, "queued", stats.Queued,
 					"max_active", stats.MaxActive, "max_queued", stats.MaxQueued)
 				writeRetryableError(w, r, http.StatusServiceUnavailable,
@@ -178,15 +195,17 @@ func Scan(deps ScanDeps) http.Handler {
 					"The service is at capacity. Retry after the interval in "+
 						"retry_after_seconds.", overloadedRetryAfterSeconds)
 			case errors.Is(err, context.DeadlineExceeded):
-				log.Warn("scan deadline exceeded while queued for admission",
-					"request_id", requestID)
+				outcome("deadline_exceeded", "error", err)
 				writeError(w, r, http.StatusGatewayTimeout,
 					contract.ErrCodeDeadlineExceeded, "Scan exceeded its deadline.")
 			default:
 				// The caller hung up. Nothing useful can be written to a
-				// connection that is gone, but the status is recorded.
-				log.Info("scan abandoned while queued for admission",
-					"request_id", requestID, "reason", err.Error())
+				// connection that is gone, but the outcome is recorded.
+				//
+				// The error is passed as a value, not as err.Error(): the
+				// handler reduces it to an identity, whereas a pre-rendered
+				// string would be emitted as written.
+				outcome("abandoned", "error", err)
 				writeError(w, r, http.StatusServiceUnavailable,
 					contract.ErrCodeDetectorUnavailable, "Scan was not admitted.")
 			}
@@ -207,16 +226,16 @@ func Scan(deps ScanDeps) http.Handler {
 			// Every failure below is an error envelope. None becomes an allow.
 			switch {
 			case errors.Is(err, detector.ErrDeadlineExceeded), errors.Is(err, context.DeadlineExceeded):
-				log.Warn("scan deadline exceeded", "request_id", requestID)
+				outcome("deadline_exceeded", "error", err)
 				writeError(w, r, http.StatusGatewayTimeout,
 					contract.ErrCodeDeadlineExceeded, "Scan exceeded its deadline.")
 			case errors.Is(err, detector.ErrResponseTooLarge), errors.Is(err, detector.ErrInvalidResponse):
 				// The detector answered, but not in a way that can be trusted.
-				log.Error("detector response rejected", "request_id", requestID, "error", err)
+				outcome("invalid_response", "error", err)
 				writeError(w, r, http.StatusServiceUnavailable,
 					contract.ErrCodeDetectorUnavailable, "Detector response could not be validated.")
 			default:
-				log.Error("detector unavailable", "request_id", requestID, "error", err)
+				outcome("detector_unavailable", "error", err)
 				writeError(w, r, http.StatusServiceUnavailable,
 					contract.ErrCodeDetectorUnavailable, "Detector is not available.")
 			}
@@ -228,12 +247,26 @@ func Scan(deps ScanDeps) http.Handler {
 			// A label or mode the policy cannot evaluate is a failure, not a
 			// permissive default. The scan does not become an allow because
 			// the gateway did not understand the answer.
-			log.Error("policy could not evaluate the assessment",
-				"request_id", requestID, "error", err)
+			outcome("policy_error", "error", err, "label", string(assessment.Assessment.Label))
 			writeError(w, r, http.StatusServiceUnavailable,
 				contract.ErrCodeDetectorUnavailable, "Assessment could not be evaluated.")
 			return
 		}
+
+		outcome("complete",
+			"caller", caller.Name,
+			"task_id", string(req.TaskID),
+			// The label and action are outcomes with a handful of possible
+			// values. The evidence quotations are the thing that must never
+			// be logged, and they are not here.
+			"label", string(assessment.Assessment.Label),
+			"action", string(decision.Action),
+			"reason_code", string(decision.ReasonCode),
+			"passage_bytes", assessment.Coverage.OriginalUTF8Bytes,
+			"scanned_bytes", assessment.Coverage.ScannedUTF8Bytes,
+			"detector", assessment.Versions.Detector,
+			"prompt", assessment.Versions.Prompt,
+			"policy", deps.Mode.Identity())
 
 		writeJSON(w, http.StatusOK, contract.ScanResponse{
 			RequestID:  requestID,
