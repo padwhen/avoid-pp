@@ -32,7 +32,7 @@ from translation_guard.detectors import (
     DetectorUnavailable,
     FakeDetector,
 )
-from translation_guard.detectors.claude import PROMPT_VERSION as CLAUDE_PROMPT_VERSION
+from translation_guard.prompts import DEFAULT_VERSION as CLAUDE_PROMPT_VERSION
 from translation_guard.schemas import (
     AssessmentRequest,
     AssessmentResponse,
