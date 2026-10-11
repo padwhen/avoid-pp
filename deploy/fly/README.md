@@ -6,13 +6,24 @@ honest way to put the guard next to a backend that already runs on Fly.
 
 ```sh
 fly apps create avoid-pp-detector
-fly secrets set -a avoid-pp-detector LLM_API_KEY="$LLM_API_KEY"
-fly deploy -a avoid-pp-detector -c deploy/fly/detector.fly.toml
+grep '^LLM_API_KEY=' .env | fly secrets import -a avoid-pp-detector
+cd detector && fly deploy -a avoid-pp-detector -c ../deploy/fly/detector.fly.toml \
+  --dockerfile Dockerfile
 
 fly apps create avoid-pp-gateway
-fly secrets set -a avoid-pp-gateway AVOIDPP_API_KEYS="learningapp:translate_fi_en_v1:$(openssl rand -hex 24)"
-fly deploy -a avoid-pp-gateway -c deploy/fly/gateway.fly.toml
+printf 'AVOIDPP_API_KEYS=%s\n' "caller:translate_fi_en_v1:$(openssl rand -hex 24)" \
+  | fly secrets import -a avoid-pp-gateway
+cd gateway && fly deploy -a avoid-pp-gateway -c ../deploy/fly/gateway.fly.toml \
+  --dockerfile Dockerfile
 ```
+
+**Deploy from the service directory, not the repository root.** Both
+Dockerfiles expect their own directory as the build context - the detector's
+`COPY src ./src` is relative to `detector/`. Run it from the root and the
+build fails with `"/src": not found`.
+
+Secrets go in by `fly secrets import` reading stdin, so a key never appears
+in a shell history or a process list.
 
 The detector first: the gateway starts without it, but a gateway whose
 detector does not answer refuses every scan, which looks like a broken
@@ -25,6 +36,45 @@ fly secrets set -a <your-backend> \
   AVOIDPP_URL="http://avoid-pp-gateway.internal:8080" \
   AVOIDPP_KEY="<the key above>"
 ```
+
+## On Apple Silicon
+
+Two things bite, and both cost an hour the first time.
+
+**`--local-only` needs `DOCKER_HOST` if you use colima or Rancher.** flyctl
+looks for the default Docker socket and reports `docker is unavailable to
+build the deployment image` even though `docker version` works. Point it at
+the real socket:
+
+```sh
+export DOCKER_HOST=$(docker context inspect colima --format '{{.Endpoints.docker.Host}}')
+```
+
+**The Go build crashes under amd64 emulation.** Fly machines are amd64, and
+building the gateway image on an arm64 Mac panics inside the Go toolchain
+itself:
+
+    panic: runtime error: growslice: len out of range
+      go/parser.ParseFile.func1()
+
+Not a code problem - the same build is clean natively. Cross-compile on the
+host and ship the binary, which is also much faster:
+
+```sh
+cd gateway
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o /tmp/gateway ./cmd/server
+printf 'FROM scratch\nUSER 65532:65532\nCOPY gateway /gateway\nENTRYPOINT ["/gateway"]\n' > /tmp/Dockerfile
+cd /tmp && docker build --platform linux/amd64 -t registry.fly.io/avoid-pp-gateway:host .
+docker push registry.fly.io/avoid-pp-gateway:host
+fly deploy -a avoid-pp-gateway -c deploy/fly/gateway.fly.toml --image registry.fly.io/avoid-pp-gateway:host
+```
+
+The detector is Python and builds fine under emulation, so only the gateway
+needs this.
+
+A remote builder (`--remote-only`) avoids both and is the better answer when
+it works; ours returned `401 Unauthorized` pushing to the Fly registry, twice,
+with a valid login.
 
 ## Why no public address
 
@@ -45,6 +95,11 @@ new ScanClient({
   allowPlaintextHosts: ['avoid-pp-gateway.internal'],
 });
 ```
+
+The caller needs the updated client: `allowPlaintextHosts` arrived after the
+first version of this file, so a vendored copy taken before it will refuse the
+`.internal` URL and report `misconfigured` on every call. That is the client
+working as designed, and it is confusing for ten minutes.
 
 A named list rather than a boolean, so what is being trusted is written down.
 If you would rather not do that, give the gateway an `[http_service]` with
