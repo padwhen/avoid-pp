@@ -1094,6 +1094,57 @@ produced a single segment, so the risk that segmentation strips the framing
 which distinguishes a *reported* instruction from an issued one is
 **untested, not disproved**. See [C38](docs/c38-segmentation.md).
 
+## Local classifiers: benchmarked, not adopted
+
+```sh
+make local-bench               # refuses, prints what it would download
+make local-bench CONFIRM=yes   # free of provider cost, ~2.5 GB of models
+```
+
+Can a free local model replace the hosted detector, or screen for it? **No
+to both**, and the measurement is specific about why. 436 development cases,
+the same split and labels as the hosted run, on an Apple M2 with 8 GiB, CPU
+only.
+
+| | recall | false positives | p50 | peak RSS |
+|---|---|---|---|---|
+| claude-opus-5 (hosted) | **0.962** | **0.000** | 2 833 ms | — |
+| Horizon-Labs mmBERT | 0.679 | 0.018 | **50 ms** | 695 MB |
+| proventra mDeBERTa | 0.641 | 0.050 | 69 ms | 617 MB |
+| ProtectAI DeBERTa (en) | 0.623 | **0.125** | 70 ms | 614 MB |
+
+Every one **misses the recall gate** of 0.90, with no interval reaching
+0.802. Two miss the false-positive gate too; Horizon-Labs' interval spans
+it, so that one gate is `undetermined` rather than failed — decided by the
+same shared three-outcome rule as the gate report, which is what keeps the
+distinction.
+
+**No prompt-injection classifier on the Hub declares Finnish support**, which
+is the review this starts with rather than a footnote on the results. Two
+further candidates were excluded before measurement: Llama Prompt Guard 2 is
+gated behind manual acceptance of a bespoke licence, which is not a decision
+this repository makes on anyone's behalf.
+
+Local inference is 40 to 57 times faster and costs nothing per call. It also
+misses about a third of the attacks. A cascade using the best of them as a
+free screen would save **90.1% of hosted calls** and miss **17 of 53
+attacks** outright, because a cascade's recall is bounded by its screen's —
+a passage the screen calls clean is never seen by anything that could
+disagree. That is the untested bypass C39-AC3 forbids, so no cascade exists,
+and **the decision is a test**: `DetectorMode` has no local member,
+`build_detector` cannot construct one, and a test fails if either changes.
+
+Two findings worth more than the verdict. **An English-only classifier flags
+one ordinary Finnish passage in eight** — 48 of 383, exactly as its model
+card warns, which is what "do not substitute English benchmark scores" looks
+like in numbers. And **a multilingual base fixes false positives, not
+recall**: across DeBERTa, mDeBERTa and mmBERT the false-positive rate falls
+sevenfold while recall barely moves. Pretraining on Finnish teaches a model
+what ordinary Finnish looks like; it does not teach it what a Finnish attack
+looks like, and none of these was fine-tuned on one.
+
+See [C39](docs/c39-local-classifiers.md).
+
 ## Where this stands
 
 [**C30 — Finnish MVP gate report**](docs/c30-gate-report.md) is the release

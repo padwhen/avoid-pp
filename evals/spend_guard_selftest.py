@@ -1,4 +1,4 @@
-"""Assert that no money-spending tool runs without explicit confirmation.
+"""Assert that no expensive tool runs without explicit confirmation.
 
 This exists because one of them did. An indentation mistake in a string
 replacement moved `return 1` inside an unrelated `if`, so
@@ -7,6 +7,9 @@ provider calls - about $1.60 - when it had been asked only for an estimate.
 
 The guard had no test, so nothing noticed. A confirmation check is a safety
 property, and a safety property without a test is a comment.
+
+Expensive is mostly provider spend, and once is a 2.5 GB model download:
+the guard is the same shape in both cases.
 
 Each tool is invoked in-process with no confirmation flag and must:
 
@@ -53,21 +56,35 @@ def _poison_provider() -> None:
     anthropic.Anthropic = refuse  # type: ignore[assignment]
 
 
-# Each entry: a label, the module path, and the argv that must be refused.
+# Each entry: a label, the module path, the argv that must be refused, and
+# the unit the estimate has to be denominated in. A refusal that does not
+# quantify what it declined to do is not actionable, and the quantity is
+# dollars for every tool here but one.
 TOOLS = [
-    ("outcome_eval", "outcome_eval", []),
-    ("outcome_eval --attacks-only", "outcome_eval", ["--attacks-only"]),
-    ("outcome_eval --limit 5", "outcome_eval", ["--limit", "5"]),
-    ("live_eval", "live_eval", []),
-    ("live_eval --limit 3", "live_eval", ["--limit", "3"]),
-    ("provider_profile", "provider_profile", []),
-    ("provider_profile --reps 1", "provider_profile", ["--reps", "1"]),
-    ("challenge", "challenge", []),
-    ("segmented", "segmented", []),
+    ("outcome_eval", "outcome_eval", [], "$"),
+    ("outcome_eval --attacks-only", "outcome_eval", ["--attacks-only"], "$"),
+    ("outcome_eval --limit 5", "outcome_eval", ["--limit", "5"], "$"),
+    ("live_eval", "live_eval", [], "$"),
+    ("live_eval --limit 3", "live_eval", ["--limit", "3"], "$"),
+    ("provider_profile", "provider_profile", [], "$"),
+    ("provider_profile --reps 1", "provider_profile", ["--reps", "1"], "$"),
+    ("challenge", "challenge", [], "$"),
+    ("segmented", "segmented", [], "$"),
+    # Spends bandwidth and disk rather than money - about 2.5 GB of model
+    # artifacts - and the property asserted is the same one: without
+    # confirmation it refuses, prints what it would do, and does none of it.
+    ("local_bench", "local_bench", [], "GB"),
+    ("local_bench --limit 4", "local_bench", ["--limit", "4"], "GB"),
 ]
 
 
-def check(label: str, module_name: str, argv: list[str], failures: list[str]) -> None:
+def check(
+    label: str,
+    module_name: str,
+    argv: list[str],
+    unit: str,
+    failures: list[str],
+) -> None:
     import importlib
 
     module = importlib.import_module(module_name)
@@ -94,8 +111,8 @@ def check(label: str, module_name: str, argv: list[str], failures: list[str]) ->
         )
     # An estimate is the whole point of the dry run: a refusal that does not
     # say what the run would cost is a refusal the user cannot act on.
-    if "$" not in output:
-        failures.append(f"{label}: refused without printing a cost estimate")
+    if unit not in output:
+        failures.append(f"{label}: refused without printing an estimate in {unit}")
     if "confirm" not in output.lower():
         failures.append(f"{label}: refused without saying how to proceed")
 
@@ -104,8 +121,8 @@ def main() -> int:
     _poison_provider()
     failures: list[str] = []
 
-    for label, module_name, argv in TOOLS:
-        check(label, module_name, argv, failures)
+    for label, module_name, argv, unit in TOOLS:
+        check(label, module_name, argv, unit, failures)
 
     # And the holdout refusal, which is a different guard with the same shape:
     # a tool that reads the holdout must refuse even *with* confirmation.

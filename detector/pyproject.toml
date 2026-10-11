@@ -16,6 +16,22 @@ dependencies = [
 ]
 
 [dependency-groups]
+# C39 only, and deliberately not installed by default.
+#
+# torch and transformers are roughly two gigabytes installed, for an
+# experiment whose conclusion is recorded in docs/c39-local-classifiers.md
+# and whose code is not in the request path. `make bootstrap` and CI install
+# the default groups, so neither pays for this; `make local-bench` installs
+# it on demand.
+local = [
+    # Upper bound because of the machine this was measured on: torch 2.12
+    # and later publish macOS arm64 wheels built for macosx_14_0, and the
+    # hardware C39 names runs macOS 13.5. Pinning below that keeps the
+    # benchmark reproducible on the machine whose numbers are published.
+    "torch>=2.6.0,<2.12.0",
+    "transformers>=4.48.0",
+    "sentencepiece>=0.2.0",
+]
 dev = [
     "httpx>=0.28.1",
     "jsonschema>=4.26.0",
@@ -44,6 +60,16 @@ select = ["E4", "E7", "E9", "F", "I", "UP", "B"]
 python_version = "3.13"
 strict = true
 files = ["src"]
+
+# The C39 local-classifier group is not installed in the checked
+# environment, deliberately - CI should not download two gigabytes of torch
+# to type-check a module that is not in the request path. The imports are
+# inside a function and guarded by an ImportError that produces a clear
+# message, so an absent stub here is the accurate state of affairs rather
+# than a suppression.
+[[tool.mypy.overrides]]
+module = ["torch.*", "transformers.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 # Lets async tests be plain `async def` without a decorator on each one.

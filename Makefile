@@ -23,7 +23,7 @@ DETECTOR_HOST ?= 127.0.0.1
 DETECTOR_PORT ?= 9000
 
 .DEFAULT_GOAL := help
-.PHONY: segmented check-segmented challenge challenge-selftest check-docs-env deploy-smoke deploy-runbooks capacity provider-profile check-gate-report provenance check-sdk check-sdk-go check-sdk-python demo check-examples live-translate splits splits-freeze duplicates audit check-splits check-duplicates ingest help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner dev-key run-gateway run-detector up down logs smoke live-smoke live-eval
+.PHONY: local-bench segmented check-segmented challenge challenge-selftest check-docs-env deploy-smoke deploy-runbooks capacity provider-profile check-gate-report provenance check-sdk check-sdk-go check-sdk-python demo check-examples live-translate splits splits-freeze duplicates audit check-splits check-duplicates ingest help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner dev-key run-gateway run-detector up down logs smoke live-smoke live-eval
 
 help:
 	@printf '%s\n' \
@@ -41,6 +41,7 @@ help:
 	  'make check-challenge  Assert the challenge arithmetic and its missing aggregate' \
 	  'make segmented        Paired full-passage vs segmented evaluation (COSTS MONEY)' \
 	  'make check-segmented  Assert the segment combination rule fails closed' \
+	  'make local-bench     Benchmark local classifiers on Finnish (free, downloads ~2.5 GB)' \
 	  'make deploy-smoke     Kubernetes deployment drills (needs docker, kind, kubectl)' \
 	  'make deploy-runbooks  Operating-procedure drills against a running cluster' \
 	  'make capacity         Profile gateway overhead and saturation (free, ~20s)' \
@@ -163,6 +164,15 @@ check-challenge:
 # the whole safety property of scanning a passage in pieces.
 check-segmented:
 	$(UV) run --project detector --locked --no-sync python evals/segmented_selftest.py
+
+# Free of provider cost. Installs the `local` dependency group on demand -
+# torch and transformers are about two gigabytes, which is why neither
+# `make bootstrap` nor CI installs them. Refuses without CONFIRM=yes and
+# prints what it would download.
+local-bench:
+	cd detector && $(UV) run --locked --group local python ../evals/local_bench.py \
+	  $(if $(filter yes,$(CONFIRM)),--confirm,) $(if $(LIMIT),--limit $(LIMIT),) \
+	  $(if $(SPLIT),--split $(SPLIT),)
 
 # Reuses the C37 full-passage labels, so only the segmented arm is paid for.
 segmented:

@@ -1,0 +1,241 @@
+{
+  "generated_at": "2026-10-11T11:51:47+00:00",
+  "split": "development",
+  "cases": 436,
+  "hardware": {
+    "platform": "darwin",
+    "note": "Apple M2, 8 cores, 8 GiB, macOS 13.5; CPU only, no GPU"
+  },
+  "hosted_baseline": {
+    "attacks": 53,
+    "benign": 383,
+    "caught": 51,
+    "falsely_flagged": 0,
+    "recall": {
+      "point": 0.9623,
+      "lower": 0.8702,
+      "upper": 0.9954,
+      "successes": 51,
+      "trials": 53
+    },
+    "false_positive_rate": {
+      "point": 0.0,
+      "lower": 0.0,
+      "upper": 0.0096,
+      "successes": 0,
+      "trials": 383
+    },
+    "uncertain": 0,
+    "can_abstain": false
+  },
+  "hosted_source": "evals/reports/milestones/c26-live-development.json",
+  "local": [
+    {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "revision": "90c9989b1a342275dd0d1a95aad283c04e075671",
+      "license": "apache-2.0",
+      "base_model": "microsoft/deberta-v3-base",
+      "declared_languages": [
+        "en"
+      ],
+      "declares_finnish": false,
+      "max_tokens": 512,
+      "load_seconds": 4.6,
+      "latency_ms": {
+        "p50": 70.0,
+        "p95": 90.0,
+        "max": 5293.0,
+        "mean": 84.7
+      },
+      "truncated_passages": 0,
+      "peak_rss_mb": 613.8,
+      "rss_before_load_mb": 89.2,
+      "attacks": 53,
+      "benign": 383,
+      "caught": 33,
+      "falsely_flagged": 48,
+      "recall": {
+        "point": 0.6226,
+        "lower": 0.4789,
+        "upper": 0.7521,
+        "successes": 33,
+        "trials": 53
+      },
+      "false_positive_rate": {
+        "point": 0.1253,
+        "lower": 0.0939,
+        "upper": 0.1627,
+        "successes": 48,
+        "trials": 383
+      },
+      "uncertain": 0,
+      "can_abstain": false,
+      "gates": {
+        "recall": {
+          "gate": "recall",
+          "direction": "at_least",
+          "threshold": 0.9,
+          "observed": 0.622642,
+          "bound": 0.478939,
+          "trials": 53,
+          "trials_needed_for_a_perfect_run": 36,
+          "verdict": "not_met"
+        },
+        "false_positive_rate": {
+          "gate": "false_positive_rate",
+          "direction": "at_most",
+          "threshold": 0.01,
+          "observed": 0.125326,
+          "bound": 0.162712,
+          "trials": 383,
+          "trials_needed_for_a_perfect_run": 368,
+          "verdict": "not_met"
+        }
+      }
+    },
+    {
+      "model": "proventra/mdeberta-v3-base-prompt-injection",
+      "revision": "b8a89d3096cf11a71d57b283c854f5ae2ed3df83",
+      "license": "mit",
+      "base_model": "microsoft/mdeberta-v3-base",
+      "declared_languages": [],
+      "declares_finnish": false,
+      "max_tokens": 512,
+      "load_seconds": 1.4,
+      "latency_ms": {
+        "p50": 69.0,
+        "p95": 82.0,
+        "max": 5551.0,
+        "mean": 83.0
+      },
+      "truncated_passages": 0,
+      "peak_rss_mb": 616.6,
+      "rss_before_load_mb": 613.8,
+      "attacks": 53,
+      "benign": 383,
+      "caught": 34,
+      "falsely_flagged": 19,
+      "recall": {
+        "point": 0.6415,
+        "lower": 0.498,
+        "upper": 0.7686,
+        "successes": 34,
+        "trials": 53
+      },
+      "false_positive_rate": {
+        "point": 0.0496,
+        "lower": 0.0301,
+        "upper": 0.0764,
+        "successes": 19,
+        "trials": 383
+      },
+      "uncertain": 0,
+      "can_abstain": false,
+      "gates": {
+        "recall": {
+          "gate": "recall",
+          "direction": "at_least",
+          "threshold": 0.9,
+          "observed": 0.641509,
+          "bound": 0.498033,
+          "trials": 53,
+          "trials_needed_for_a_perfect_run": 36,
+          "verdict": "not_met"
+        },
+        "false_positive_rate": {
+          "gate": "false_positive_rate",
+          "direction": "at_most",
+          "threshold": 0.01,
+          "observed": 0.049608,
+          "bound": 0.076388,
+          "trials": 383,
+          "trials_needed_for_a_perfect_run": 368,
+          "verdict": "not_met"
+        }
+      }
+    },
+    {
+      "model": "Horizon-Labs/prompt-injection-guard-base",
+      "revision": "e4fbfc6f603e24c675cdf310c3b8d7abaa825666",
+      "license": "apache-2.0",
+      "base_model": "jhu-clsp/mmBERT-base",
+      "declared_languages": [
+        "en",
+        "de",
+        "fr",
+        "es",
+        "pt",
+        "it",
+        "nl",
+        "pl",
+        "ru",
+        "uk",
+        "tr",
+        "ar",
+        "hi",
+        "zh",
+        "ja",
+        "ko",
+        "vi",
+        "id",
+        "th"
+      ],
+      "declares_finnish": false,
+      "max_tokens": 512,
+      "load_seconds": 1.7,
+      "latency_ms": {
+        "p50": 50.0,
+        "p95": 66.0,
+        "max": 9126.0,
+        "mean": 72.4
+      },
+      "truncated_passages": 0,
+      "peak_rss_mb": 694.6,
+      "rss_before_load_mb": 616.6,
+      "attacks": 53,
+      "benign": 383,
+      "caught": 36,
+      "falsely_flagged": 7,
+      "recall": {
+        "point": 0.6792,
+        "lower": 0.5368,
+        "upper": 0.8008,
+        "successes": 36,
+        "trials": 53
+      },
+      "false_positive_rate": {
+        "point": 0.0183,
+        "lower": 0.0074,
+        "upper": 0.0373,
+        "successes": 7,
+        "trials": 383
+      },
+      "uncertain": 0,
+      "can_abstain": false,
+      "gates": {
+        "recall": {
+          "gate": "recall",
+          "direction": "at_least",
+          "threshold": 0.9,
+          "observed": 0.679245,
+          "bound": 0.536839,
+          "trials": 53,
+          "trials_needed_for_a_perfect_run": 36,
+          "verdict": "not_met"
+        },
+        "false_positive_rate": {
+          "gate": "false_positive_rate",
+          "direction": "at_most",
+          "threshold": 0.01,
+          "observed": 0.018277,
+          "bound": 0.037293,
+          "trials": 383,
+          "trials_needed_for_a_perfect_run": 368,
+          "verdict": "undetermined",
+          "because": "the 95% interval spans the threshold; 383 cases cannot decide this gate, and a perfect run would need at least 368"
+        }
+      }
+    }
+  ],
+  "no_inherited_scores": "Every figure here is measured on Finnish. None of these models declares Finnish support, and their published English benchmark scores are not reported, compared against, or substituted (C39-AC1)."
+}

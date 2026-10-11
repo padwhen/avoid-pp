@@ -165,3 +165,35 @@ def test_the_segmenter_is_not_in_the_request_path() -> None:
         "1.62x the cost with no quality gain and retained the full-passage "
         "path; adopting it needs a new measurement, not an import."
     )
+
+
+def test_the_local_classifier_is_not_reachable_from_configuration() -> None:
+    """C39-AC3: a low local score cannot create an untested bypass.
+
+    The tempting shape is a cascade - run the free local model first, skip
+    the paid call when it says clean. C39 measured the best available local
+    model at recall 0.679 on Finnish, so that cascade would miss about a
+    third of attacks outright while saving 90% of the provider spend.
+
+    `DetectorMode` therefore has no local member and `build_detector`
+    cannot construct one. Adopting it needs a code change in front of a
+    reviewer, and this is the thing that puts it there.
+    """
+    from translation_guard.config import DetectorMode
+
+    modes = {member.value for member in DetectorMode}
+    assert "local" not in modes, (
+        "DetectorMode gained a local option. C39 measured the best local "
+        "classifier at recall 0.679 against a 0.90 gate; routing to it "
+        "needs a new measurement, not a new enum member."
+    )
+
+    import inspect
+
+    from translation_guard import api
+
+    source = inspect.getsource(api.build_detector)
+    assert "LocalDetector" not in source, (
+        "build_detector can construct the local classifier. See "
+        "docs/c39-local-classifiers.md before wiring it in."
+    )
