@@ -32,31 +32,56 @@ pass=0; fail=0
 ok()   { printf '  \033[32mPASS\033[0m %s\n' "$1"; pass=$((pass+1)); }
 bad()  { printf '  \033[31mFAIL\033[0m %s\n' "$1"; fail=$((fail+1)); }
 step() { printf '\n\033[1m%s\033[0m\n' "$1"; }
+note() { printf '  %s\n' "$1"; }
+
+# Every long step says what it is doing and how long it took. The first
+# version printed "Building images" and then nothing for a minute on a cold
+# Docker cache, which is indistinguishable from a hang - and the only
+# reasonable response to a hang is Ctrl-C.
+timed() { # $1 = description, rest = command
+  local description="$1"; shift
+  local started; started=$SECONDS
+  printf '  %s ... ' "$description"
+  if "$@"; then
+    printf 'done (%ss)\n' "$((SECONDS - started))"
+  else
+    printf '\033[31mfailed\033[0m\n'; return 1
+  fi
+}
+
+# Ctrl-C at any point is safe; say so rather than leaving someone guessing.
+on_interrupt() {
+  printf '\n\033[1minterrupted\033[0m\n'
+  printf '  Nothing is left running unless the cluster was already created.\n'
+  printf '  To be sure:  %s down\n' "$0"
+  exit 130
+}
+trap on_interrupt INT
 
 up() {
   step "Building images"
-  docker build -q -t avoid-pp/gateway:local "$ROOT/gateway" >/dev/null
-  docker build -q -t avoid-pp/detector:local "$ROOT/detector" >/dev/null
+  note "a cold Docker cache takes a minute or two; a warm one is seconds"
+  timed "gateway " docker build -q -t avoid-pp/gateway:local "$ROOT/gateway"
+  timed "detector" docker build -q -t avoid-pp/detector:local "$ROOT/detector"
 
   step "Creating cluster (no default CNI)"
   kind delete cluster --name "$CLUSTER" >/dev/null 2>&1 || true
-  kind create cluster --config "$HERE/kind-cluster.yaml" >/dev/null
+  timed "kind create" sh -c "kind create cluster --config \"$HERE/kind-cluster.yaml\" >/dev/null 2>&1"
 
   step "Installing Calico"
   # kindnet accepts NetworkPolicy and enforces none of it, which would make
   # the isolation drill report a pass it did not earn.
-  kubectl apply -f "$CALICO" >/dev/null
-  kubectl -n kube-system rollout status ds/calico-node --timeout=300s >/dev/null
-  kubectl wait --for=condition=Ready node --all --timeout=180s >/dev/null
+  note "pinned to $(basename "$(dirname "$CALICO")")"
+  timed "applying manifest" sh -c "kubectl apply -f \"$CALICO\" >/dev/null"
+  timed "waiting for calico-node" \
+    sh -c "kubectl -n kube-system rollout status ds/calico-node --timeout=300s >/dev/null"
+  timed "waiting for the node" \
+    sh -c "kubectl wait --for=condition=Ready node --all --timeout=180s >/dev/null"
 
   step "Deploying"
-  kind load docker-image avoid-pp/gateway:local avoid-pp/detector:local \
-    --name "$CLUSTER" >/dev/null
-  kubectl apply \
-    -f "$HERE/00-namespace.yaml" \
-    -f "$HERE/20-detector.yaml" \
-    -f "$HERE/30-gateway.yaml" \
-    -f "$HERE/40-networkpolicy.yaml" >/dev/null
+  timed "loading images into the cluster" \
+    sh -c "kind load docker-image avoid-pp/gateway:local avoid-pp/detector:local --name \"$CLUSTER\" >/dev/null 2>&1"
+  timed "applying manifests" sh -c "kubectl apply -f \"$HERE/00-namespace.yaml\" -f \"$HERE/20-detector.yaml\" -f \"$HERE/30-gateway.yaml\" -f \"$HERE/40-networkpolicy.yaml\" >/dev/null"
 
   # The Secret is created here rather than committed. The gateway refuses to
   # start without it, which is C19 behaving correctly and is why the
@@ -68,8 +93,11 @@ up() {
     --from-literal=AVOIDPP_API_KEYS="pilot:translate_fi_en_v1:${KEY1}" >/dev/null
 
   kubectl -n "$NS" rollout restart deploy/gateway >/dev/null
-  kubectl -n "$NS" rollout status deploy/detector --timeout=180s >/dev/null
-  kubectl -n "$NS" rollout status deploy/gateway --timeout=180s >/dev/null
+  timed "waiting for the detector" \
+    sh -c "kubectl -n \"$NS\" rollout status deploy/detector --timeout=180s >/dev/null"
+  timed "waiting for the gateway " \
+    sh -c "kubectl -n \"$NS\" rollout status deploy/gateway --timeout=180s >/dev/null"
+  echo
   kubectl -n "$NS" get pods
 }
 
