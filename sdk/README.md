@@ -1,9 +1,9 @@
 # SDK clients
 
-Thin typed clients for `POST /v1/scans`, in Python and Go.
+Thin typed clients for `POST /v1/scans`, in Python, Go and Node.
 
 ```sh
-make check-sdk     # both clients against the shared expectations table
+make check-sdk     # all three clients against the shared expectations table
 ```
 
 There is no package to install. Vendor the directory you need, or import it
@@ -18,8 +18,13 @@ from avoidpp import ScanClient, permits_translation
 import "github.com/padwhen/avoid-pp/sdk/go/avoidpp"
 ```
 
-Standard library only on the Go side; `httpx` on the Python side, which the
-repository already depends on.
+```js
+const { ScanClient, permitsTranslation } = require('./avoidpp'); // sdk/node
+```
+
+Standard library only on the Go and Node sides; `httpx` on the Python side,
+which the repository already depends on. See [the Node
+client](node/README.md) for the JavaScript notes.
 
 ## Using them
 
@@ -74,8 +79,13 @@ if verdict.PermitsTranslation(false) && verdict.Covers(passage) {
 
 [`contract-expectations.json`](contract-expectations.json) states what a
 correct client does with every wire shape - 48 cases, most of them pointing at
-`contracts/fixtures/`. Both test suites read it, so the two clients cannot
-quietly disagree; they already did once, about wrong-typed JSON fields, and
-that is how it was found.
+`contracts/fixtures/`. All three test suites read it, so the clients cannot
+quietly disagree; two of them already did once, about wrong-typed JSON fields,
+and that is how it was found.
+
+Adding the third client is the test of whether that worked. It did: the table
+caught nothing wrong with the Node client's contract handling, and the one
+failure it produced was in the new harness rather than the client - 204 is a
+null-body status and `new Response('', {status: 204})` throws.
 
 Reasoning in [docs/c41-sdk.md](../docs/c41-sdk.md).

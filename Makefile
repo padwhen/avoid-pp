@@ -1,6 +1,7 @@
 GO ?= go
 GOFMT ?= gofmt
 UV ?= uv
+NODE ?= node
 
 # Local run defaults. 8080 is the gateway's own default, but is often taken by
 # another service (nginx, for one), so the convenience target uses 8099.
@@ -23,7 +24,7 @@ DETECTOR_HOST ?= 127.0.0.1
 DETECTOR_PORT ?= 9000
 
 .DEFAULT_GOAL := help
-.PHONY: up-live smoke-live local-bench segmented check-segmented challenge challenge-selftest check-docs-env deploy-smoke deploy-runbooks capacity provider-profile check-gate-report provenance check-sdk check-sdk-go check-sdk-python demo check-examples live-translate splits splits-freeze duplicates audit check-splits check-duplicates ingest help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner dev-key run-gateway run-detector up down logs smoke live-smoke live-eval
+.PHONY: up-live smoke-live local-bench segmented check-segmented challenge challenge-selftest check-docs-env deploy-smoke deploy-runbooks capacity provider-profile check-gate-report provenance check-sdk check-sdk-go check-sdk-python check-sdk-node demo check-examples live-translate splits splits-freeze duplicates audit check-splits check-duplicates ingest help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner dev-key run-gateway run-detector up down logs smoke live-smoke live-eval
 
 help:
 	@printf '%s\n' \
@@ -33,7 +34,7 @@ help:
 	  'make check-python Check Python formatting, lint, types, tests and package import' \
 	  'make check-contracts  Validate contract schemas against positive/negative fixtures' \
 	  'make check-contracts-selftest  Prove the contract validator rejects bad data' \
-	  'make check-sdk        Test both SDK clients against the shared expectations table' \
+	  'make check-sdk        Test all three SDK clients against the shared expectations table' \
 	  'make check-gate-report  Verify every input the C30 gate report is a claim about' \
 	  'make provenance       Print the dataset file and scored-content digests' \
 	  'make check-docs-env   Assert every AVOIDPP_* named in the docs is read somewhere' \
@@ -93,7 +94,7 @@ check-go:
 
 # The SDK is a separate Go module, so `./...` in gateway/ does not see it. A
 # check that did not name it would report green on code it never compiled.
-check-sdk: check-sdk-go check-sdk-python
+check-sdk: check-sdk-go check-sdk-python check-sdk-node
 
 check-sdk-go:
 	@files="$$(cd sdk/go && $(GOFMT) -l .)" || exit $$?; \
@@ -102,6 +103,12 @@ check-sdk-go:
 	fi
 	cd sdk/go && $(GO) vet ./...
 	cd sdk/go && $(GO) test -race ./...
+
+# No package manager, no lockfile, no node_modules: the client is one file
+# with no dependencies and the test runner ships with Node. If this ever needs
+# an install step, the client has stopped being copy-and-paste deployable.
+check-sdk-node:
+	$(NODE) --test sdk/node/
 
 check-sdk-python:
 	$(UV) run --project detector --locked --no-sync ruff format --check sdk/python

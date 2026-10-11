@@ -37,6 +37,15 @@ jobs:
           # a cache on. Re-enable with cache-dependency-path when one exists.
           cache: false
 
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          # The version in .node-version, which the Node client's one
+          # requirement is a floor on: global fetch and node:test, both of
+          # which are Node 18+. No install step and no cache, because the
+          # client has no dependencies.
+          node-version-file: .node-version
+
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
         with:
@@ -48,6 +57,7 @@ jobs:
       - name: Report toolchain
         run: |
           go version
+          node --version
           uv --version
 
       # Verifies C01-AC1 on a clean checkout: resolves Go modules and installs
