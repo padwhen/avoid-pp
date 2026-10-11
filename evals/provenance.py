@@ -61,6 +61,23 @@ supports the published numbers.
 The remedy for new runs is in this module rather than in prose: record the
 scored-content digest, which does not move when an annotation does.
 
+## The corpus can grow without invalidating a measurement
+
+A whole-corpus digest answers "has anything changed", and that is not quite
+the question. The gate report's numbers are about the *development split*;
+the holdout's protection is about the *holdout split*. Adding sixty
+mixed-language cases to the challenge set at C37 changed the corpus digest
+and changed neither.
+
+The first time that happened this check failed, correctly and unhelpfully:
+it said a passage had changed when what had happened was that passages had
+been added somewhere the measurement does not look.
+
+So the manifest pins both. The corpus digest still moves on any content
+change, which is right - it is how a report notices it is describing an
+older corpus. The *split* digests are the stronger claim, and they are what
+make "the measured cases are unchanged" checkable rather than argued.
+
 ## Why this is a check and not a note
 
 A report that says "the corpus has not changed in any way that matters" is
@@ -156,6 +173,21 @@ def verify_scored_cases(
     return problems
 
 
+def assigned_split(case: dict[str, Any]) -> str:
+    """Which split a case belongs to, by the same rule splits.py uses."""
+    import splits
+
+    if case.get("deferred_quality") or case.get("category") == "mixed_language":
+        return splits.CHALLENGE
+    return splits.split_for_group(splits.group_of(case))
+
+
+def split_digest(name: str, cases: list[dict[str, Any]]) -> str:
+    """SHA-256 over one split's sorted case ids."""
+    members = sorted(str(c["id"]) for c in cases if assigned_split(c) == name)
+    return hashlib.sha256("\n".join(members).encode("utf-8")).hexdigest()
+
+
 def check(manifest_path: Path) -> int:
     """Verify every input the report is a claim about. Returns an exit code."""
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -179,6 +211,28 @@ def check(manifest_path: Path) -> int:
             f"{manifest['dataset']['path']}: {len(cases)} cases, "
             f"manifest records {manifest['dataset']['cases']}"
         )
+
+    # The split memberships the published numbers are actually about.
+    #
+    # A case id list, hashed. If a case moved between splits - or a new case
+    # landed in one - a figure computed from that split is no longer a claim
+    # about the cases it names, and no amount of corpus-level digesting
+    # would say so.
+    for name, expected_split in manifest.get("splits", {}).items():
+        actual = split_digest(name, cases)
+        if actual != expected_split["id_sha256"]:
+            problems.append(
+                f"split {name}: membership is {actual[:16]}, "
+                f"{manifest['report']} is a claim about "
+                f"{expected_split['id_sha256'][:16]}. Cases have moved into "
+                "or out of it, so the published figures describe a different "
+                "set than the one that exists."
+            )
+        if (
+            len([c for c in cases if assigned_split(c) == name])
+            != expected_split["cases"]
+        ):
+            problems.append(f"split {name}: case count has changed")
 
     # Every input report, and the frozen split manifest. These are immutable
     # snapshots: a report that changes after being published is not a
@@ -217,9 +271,11 @@ def check(manifest_path: Path) -> int:
         return 1
 
     holdout = manifest["holdout"]["state"]
+    pinned = ", ".join(sorted(manifest.get("splits", {})))
     print(
         "gate report provenance: "
         f"{len(cases)} cases, scored content {actual_content[:12]};\n"
+        f"                       split membership unchanged ({pinned});\n"
         f"                       {len(manifest['inputs'])} cited inputs unchanged;\n"
         f"                       {replayed} scored case records still match the corpus;\n"
         f"                       holdout {holdout}; "

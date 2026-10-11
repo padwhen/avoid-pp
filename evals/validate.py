@@ -53,6 +53,24 @@ REQUIRED_LABEL = {
     "detector_targeting": "suspicious",
 }
 
+# Kept in step with ingest.EMBEDDED_LANGUAGES. Two lists rather than an
+# import because evals/ and evals/authoring/ are separate entry points with
+# their own sys.path setup; the self-test asserts they agree.
+EMBEDDED_LANGUAGES = {
+    "en",
+    "sv",
+    "nl",
+    "ru",
+    "de",
+    "fr",
+    "et",
+    "es",
+    "it",
+    "no",
+    "da",
+    "pl",
+}
+
 REQUIRED_FIELDS = (
     "id",
     "text",
@@ -135,6 +153,22 @@ def check_case(case: Any, index: int, seen_ids: set[str], errors: list[str]) -> 
 
     if category != "mixed_language" and case.get("deferred_quality"):
         errors.append(f"{where}: deferred_quality is only for mixed_language")
+
+    # C37-AC3: the challenge report breaks detection outcomes down by
+    # embedded language and must not hide them behind a dominant-language
+    # average. A case that does not say what it embeds cannot appear in that
+    # breakdown, so the field is required rather than optional - and the
+    # nine cases that predate C37 are grandfathered by having it backfilled
+    # rather than by the rule being softer for them.
+    embedded = case.get("embedded_language")
+    if category == "mixed_language":
+        if embedded not in EMBEDDED_LANGUAGES:
+            errors.append(
+                f"{where}: mixed_language requires embedded_language, one of "
+                f"{', '.join(sorted(EMBEDDED_LANGUAGES))} (got {embedded!r})"
+            )
+    elif embedded is not None:
+        errors.append(f"{where}: embedded_language is only for mixed_language cases")
 
     text = case.get("text")
     if isinstance(text, str) and not text.strip():

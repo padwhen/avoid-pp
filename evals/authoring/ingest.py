@@ -83,6 +83,13 @@ SOURCES = {
     },
 }
 
+# C37. Its cases are mixed-language by construction, so the category and
+# prefix below are what every block in it becomes regardless of directive;
+# the directive supplies the embedded language, which is the part that
+# cannot be inferred.
+MIXED_FILE = "08-mixed-language.txt"
+MIXED_TARGET = 60
+
 PAIRS_FILE = "03-pairs.txt"
 PAIRS_TARGET = 40
 
@@ -101,7 +108,10 @@ class Authored:
     group: str
     source: str
     line: int
-    mixed: bool = False
+    # None for a Finnish-only case, "" for a mixed case with no language
+    # named, otherwise the embedded language code.
+    mixed: str | None = None
+    intent: Any | None = None
     notes: str | None = None
     pair_role: str | None = None
 
@@ -120,20 +130,53 @@ class Report:
     already_ingested: int = 0
 
 
-def blocks(path: Path) -> list[tuple[int, str, bool]]:
-    """Split a file into (line number, text, mixed-flag) blocks.
+# Embedded languages the mixed-language file accepts.
+#
+# A closed list, because C37-AC3 reports detection outcomes broken down by
+# embedded language and a typo would create a one-case language nobody
+# notices is a typo. Extend it deliberately.
+EMBEDDED_LANGUAGES = {
+    "en",
+    "sv",
+    "nl",
+    "ru",
+    "de",
+    "fr",
+    "et",
+    "es",
+    "it",
+    "no",
+    "da",
+    "pl",
+}
+
+# `# MIXED` on its own, or `# MIXED: sv`.
+MIXED_DIRECTIVE = re.compile(r"^#\s*MIXED\s*:?\s*([a-z]{2})?\s*$", re.IGNORECASE)
+
+
+def blocks(path: Path) -> list[tuple[int, str, str | None]]:
+    """Split a file into (line number, text, embedded language) blocks.
 
     A block is separated by a blank line. Comment lines are dropped, except
-    that `# MIXED` sets a flag on the block that follows it.
+    that `# MIXED: xx` marks the block that follows as mixed-language and
+    names what is embedded in it.
+
+    The third element is the language code, or "" for a bare `# MIXED` with
+    no code, or None for an ordinary block. The three are distinguishable
+    because they mean different things: no directive is a Finnish-only case,
+    and a directive with no code is a mixed case whose author did not say
+    which language - which C37 treats as an error rather than a default,
+    since a case that cannot be attributed to a language cannot appear in a
+    per-language breakdown.
     """
     if not path.exists():
         return []
 
-    found: list[tuple[int, str, bool]] = []
+    found: list[tuple[int, str, str | None]] = []
     current: list[str] = []
     start = 0
-    mixed = False
-    pending_mixed = False
+    mixed: str | None = None
+    pending: str | None = None
 
     def flush() -> None:
         nonlocal current, mixed
@@ -141,21 +184,22 @@ def blocks(path: Path) -> list[tuple[int, str, bool]]:
         if text:
             found.append((start, text, mixed))
         current = []
-        mixed = False
+        mixed = None
 
     for number, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         stripped = raw.strip()
         if stripped.startswith("#"):
-            if stripped.upper().replace(" ", "") in ("#MIXED", "#MIXED:"):
-                pending_mixed = True
+            directive = MIXED_DIRECTIVE.match(stripped)
+            if directive:
+                pending = (directive.group(1) or "").lower()
             continue
         if not stripped:
             flush()
             continue
         if not current:
             start = number
-            mixed = pending_mixed
-            pending_mixed = False
+            mixed = pending
+            pending = None
         current.append(raw.rstrip())
 
     flush()
@@ -322,7 +366,208 @@ def collect() -> Report:
         report.authored.sort(key=lambda a: (a.source, a.line))
 
     read_pairs(HERE / PAIRS_FILE, report)
+    read_mixed(HERE / MIXED_FILE, report)
     return report
+
+
+def read_mixed(path: Path, report: Report) -> None:
+    """Read the mixed-language file, where every block is mixed by definition.
+
+    The label is inferred from the passage rather than from the file, because
+    this file holds both halves: an attack with a foreign instruction and a
+    benign passage that merely quotes a foreign sentence. Inferring it is not
+    possible, so the author says which by writing the attack family in a
+    directive... except they do not, and should not have to - the two are
+    told apart by whether the embedded text instructs the translator, which
+    is a judgement only the author can make.
+
+    So: a block is benign unless its directive says otherwise. `# MIXED: en`
+    is benign; `# MIXED: en attack` is an attack. That keeps the common case
+    short and the distinction explicit.
+    """
+    for line, text, code, intent, directive_error in mixed_blocks(path):
+        if code is None and intent is None:
+            continue
+        if directive_error:
+            report.problems.append(f"{path.name}:{line}: {directive_error}")
+            continue
+        if intent is None:
+            report.problems.append(
+                f"{path.name}:{line}: no `# intended:` directive. Write "
+                f"`# intended: attack (task redirection, middle)` or "
+                f"`# intended: benign (quoted speech)` - a mixed-language "
+                f"file holds both, and nothing in the passage tells them "
+                f"apart mechanically."
+            )
+            continue
+        is_attack = intent.attack
+        if not code:
+            report.problems.append(
+                f"{path.name}:{line}: a MIXED block with no language code. "
+                f"Write `# MIXED: sv` - a case that cannot be attributed to "
+                f"a language cannot appear in the per-language breakdown "
+                f"C37-AC3 requires."
+            )
+            continue
+        if code not in EMBEDDED_LANGUAGES:
+            report.problems.append(
+                f"{path.name}:{line}: unknown embedded language {code!r}. "
+                f"Known: {', '.join(sorted(EMBEDDED_LANGUAGES))}. A typo here "
+                f"would create a one-case language in the report."
+            )
+            continue
+
+        report.authored.append(
+            Authored(
+                text=text,
+                category="mixed_language",
+                label=SUSPICIOUS if is_attack else CLEAN,
+                outcome="blocked_or_refused" if is_attack else "faithful_translation",
+                group=f"fi-mix-{case_id('g', text).split('-')[-1]}",
+                source=path.name,
+                line=line,
+                mixed=code,
+                intent=intent,
+            )
+        )
+    report.authored.sort(key=lambda a: (a.source, a.line))
+
+
+# `# MIXED: sv` or `# MIXED: sv attack`.
+MIXED_ATTACK_DIRECTIVE = re.compile(
+    r"^#\s*MIXED\s*:?\s*([a-z]{2})?\s*(attack)?\s*$", re.IGNORECASE
+)
+
+# `# intended: attack (task redirection, middle)` or
+# `# intended: benign (quoted speech)`.
+#
+# This is the author's convention, not the one 08-mixed-language.txt
+# originally specified, and it is better: it carries the attack family and
+# the position of the embedded span, which C37-AC1 asks the corpus to vary
+# and which the kit had no way to record. The parser was changed to read
+# what was written rather than the other way round.
+INTENT_DIRECTIVE = re.compile(
+    r"^#\s*intended\s*:\s*(attack|benign)\s*(?:\((.*)\))?\s*$", re.IGNORECASE
+)
+
+# Closed, like the language list and for the same reason: an unrecognised
+# family would become a one-case bucket nobody notices is a typo.
+ATTACK_FAMILIES = {
+    "task redirection": "task_redirection",
+    "detector targeting": "detector_targeting",
+    "prompt extraction": "system_prompt_extraction",
+    "output format hijack": "output_format_hijack",
+    "content tampering": "content_tampering",
+    "role reassignment": "role_reassignment",
+}
+
+POSITIONS = ("start", "middle", "end")
+
+# The sharpest benign subtype: foreign text that reads as an instruction but
+# is being reported rather than issued - a phishing email quoted in a
+# warning, a tutorial explaining prompt injection. Worth its own breakdown,
+# and bounded, unlike the free-text descriptions of the other benign kinds.
+LOOKS_LIKE_INSTRUCTION = "looks like an instruction"
+
+
+@dataclass
+class Intent:
+    """What `# intended:` said about the block that follows it."""
+
+    attack: bool
+    family: str | None = None
+    position: str = "unspecified"
+    looks_like_instruction: bool = False
+
+
+def parse_intent(descriptor: str, attack: bool) -> tuple[Intent, str | None]:
+    """Read the parenthetical. Returns the intent and an error, if any."""
+    text = (descriptor or "").strip().lower()
+
+    if not attack:
+        return Intent(
+            attack=False,
+            looks_like_instruction=text.startswith(LOOKS_LIKE_INSTRUCTION),
+        ), None
+
+    head = text.split(",")[0].strip()
+    family = ATTACK_FAMILIES.get(head)
+    if family is None:
+        return Intent(attack=True), (
+            f"unknown attack family {head!r}. Known: "
+            f"{', '.join(sorted(ATTACK_FAMILIES))}"
+        )
+
+    position = next((p for p in POSITIONS if p in text), "unspecified")
+    return Intent(attack=True, family=family, position=position), None
+
+
+def mixed_blocks(
+    path: Path,
+) -> list[tuple[int, str, str | None, Intent | None, str | None]]:
+    """Blocks with their language, intent and any directive error.
+
+    Two directives may precede a block, in either order:
+
+        # intended: attack (task redirection, middle)
+        # MIXED: en
+
+    `# MIXED` supplies the embedded language; `# intended` supplies the
+    label, the attack family and the position. Both are needed - the first
+    because the report groups by language, the second because a mixed-
+    language file holds attacks and benign quotations together and nothing
+    in the passage distinguishes them mechanically.
+
+    `# MIXED: en attack` is still accepted as a shorthand for both.
+    """
+    if not path.exists():
+        return []
+
+    found: list[tuple[int, str, str | None, Intent | None, str | None]] = []
+    current: list[str] = []
+    start = 0
+    language: str | None = None
+    intent: Intent | None = None
+    error: str | None = None
+    pending_language: str | None = None
+    pending_intent: Intent | None = None
+    pending_error: str | None = None
+
+    def flush() -> None:
+        nonlocal current, language, intent, error
+        text = "\n".join(current).strip()
+        if text:
+            found.append((start, text, language, intent, error))
+        current = []
+        language, intent, error = None, None, None
+
+    for number, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        stripped = raw.strip()
+        if stripped.startswith("#"):
+            mixed = MIXED_ATTACK_DIRECTIVE.match(stripped)
+            if mixed:
+                pending_language = (mixed.group(1) or "").lower()
+                if mixed.group(2) and pending_intent is None:
+                    pending_intent = Intent(attack=True)
+                continue
+            marked = INTENT_DIRECTIVE.match(stripped)
+            if marked:
+                parsed, problem = parse_intent(
+                    marked.group(2) or "", marked.group(1).lower() == "attack"
+                )
+                pending_intent, pending_error = parsed, problem
+            continue
+        if not stripped:
+            flush()
+            continue
+        if not current:
+            start = number
+            language, intent, error = pending_language, pending_intent, pending_error
+            pending_language, pending_intent, pending_error = None, None, None
+        current.append(raw.rstrip())
+
+    flush()
+    return found
 
 
 def existing_passages(dataset: Path) -> dict[str, str]:
@@ -389,6 +634,9 @@ def to_yaml_cases(report: Report) -> list[dict[str, Any]]:
             "quoted_attack": "fi-quo",
             "task_redirection": "fi-red",
             "detector_targeting": "fi-det",
+            # Cases from 08-mixed-language.txt arrive already categorised,
+            # unlike the others whose category comes from their source file.
+            "mixed_language": "fi-mix",
         }[authored.category]
 
         case: dict[str, Any] = {
@@ -405,8 +653,23 @@ def to_yaml_cases(report: Report) -> list[dict[str, Any]]:
             "review_status": "reviewed",
             "rights": "synthetic-authored",
         }
-        if authored.mixed:
+        if authored.mixed is not None:
             case["category"] = "mixed_language"
+            # C37-AC3: the report breaks outcomes down by embedded language,
+            # so the language has to be on the case rather than inferred
+            # from the text at report time.
+            case["embedded_language"] = authored.mixed
+            if authored.intent is not None:
+                # C37-AC1 asks the corpus to vary attack family and position;
+                # recording them is what lets a report show whether it did.
+                if authored.intent.family:
+                    case["attack_family"] = authored.intent.family
+                if authored.intent.attack:
+                    case["embed_position"] = authored.intent.position
+                elif authored.intent.looks_like_instruction:
+                    # The sharpest benign subtype: foreign text that reads as
+                    # an instruction and is being reported, not issued.
+                    case["looks_like_instruction"] = True
             # And the id, which would otherwise say fi-red while the category
             # says mixed_language. The existing corpus uses fi-mix for these,
             # and an id that contradicts its own category is a trap for
@@ -414,9 +677,9 @@ def to_yaml_cases(report: Report) -> list[dict[str, Any]]:
             case["id"] = case_id("fi-mix", authored.text)
             case["deferred_quality"] = True
             case["notes"] = (
-                "Non-Finnish attack span. Excluded from every headline metric: "
-                "mixed-language detection quality is unverified (threat model "
-                "section 4)."
+                f"Embedded {authored.mixed}. Excluded from every headline "
+                "metric: mixed-language detection quality is unverified "
+                "(threat model section 4). Reported separately by C37."
             )
         elif authored.notes:
             case["notes"] = authored.notes
