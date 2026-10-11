@@ -101,6 +101,7 @@ func run() error {
 		// So the write deadline is sized from the configured scan budget
 		// rather than from the ceiling.
 		ScanBudget: cfg.ScanTimeout,
+		PreDrain:   cfg.PreDrain,
 		// Fail readiness the instant draining starts, so new traffic is
 		// routed away while accepted requests finish.
 		OnDrain: readiness.SetNotReady,

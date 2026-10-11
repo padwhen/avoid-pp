@@ -47,3 +47,7 @@ data/private/
 .tools/
 .workspace/
 tmp/
+
+# A generated development credential, created by deploy/kubernetes/smoke.sh.
+# It never leaves the local kind cluster and must not be committed.
+deploy/kubernetes/.key-current

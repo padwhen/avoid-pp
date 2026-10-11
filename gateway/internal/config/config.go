@@ -30,6 +30,7 @@ const (
 	EnvDetectorURL     = "AVOIDPP_DETECTOR_URL"
 	EnvScanTimeout     = "AVOIDPP_SCAN_TIMEOUT"
 	EnvShutdownTimeout = "AVOIDPP_SHUTDOWN_TIMEOUT"
+	EnvPreDrain        = "AVOIDPP_PREDRAIN"
 	EnvLogLevel        = "AVOIDPP_LOG_LEVEL"
 	EnvPolicyMode      = "AVOIDPP_POLICY_MODE"
 )
@@ -40,7 +41,18 @@ const (
 	DefaultAddr            = ":8080"
 	DefaultScanTimeout     = 15 * time.Second
 	DefaultShutdownTimeout = 10 * time.Second
-	DefaultLogLevel        = "info"
+
+	// DefaultPreDrain is zero, and that is the right default for a single
+	// process: there is no load balancer to tell, so waiting buys nothing
+	// and makes every local Ctrl-C slower.
+	//
+	// An orchestrated deployment must set it. C34 measured a rolling restart
+	// dropping one request in forty without it, because readiness failing
+	// and the listener closing happen in the same instant while endpoint
+	// withdrawal takes seconds. deploy/kubernetes/30-gateway.yaml sets 5s,
+	// derived from its readiness probe period.
+	DefaultPreDrain = 0 * time.Second
+	DefaultLogLevel = "info"
 
 	// Monitoring is the default and the only mode available before the
 	// quality gates at C30 are met. Enforcement must be chosen deliberately.
@@ -49,6 +61,12 @@ const (
 	// An end-to-end scan budget longer than this is a configuration mistake:
 	// it covers admission wait, internal HTTP, provider work and any retry.
 	maxScanTimeout = 60 * time.Second
+
+	// A pre-drain wait plus the drain budget has to fit inside the
+	// orchestrator's termination grace period, or the process is killed
+	// while still finishing work. 30s is the grace period in
+	// deploy/kubernetes/30-gateway.yaml.
+	maxPreDrain = 15 * time.Second
 )
 
 var logLevels = map[string]bool{"debug": true, "info": true, "warn": true, "error": true}
@@ -59,8 +77,12 @@ type Config struct {
 	DetectorURL     *url.URL
 	ScanTimeout     time.Duration
 	ShutdownTimeout time.Duration
-	LogLevel        string
-	PolicyMode      policy.Mode
+
+	// PreDrain keeps the listener open, with readiness failing, so an
+	// orchestrator can withdraw the endpoint before the socket closes.
+	PreDrain   time.Duration
+	LogLevel   string
+	PolicyMode policy.Mode
 
 	// Callers is the authenticated caller set. It holds key digests, not
 	// keys, so a Config that reaches a log or a dump carries no credential.
@@ -85,6 +107,7 @@ func Load(getenv Getenv) (*Config, error) {
 		Addr:            valueOr(getenv(EnvAddr), DefaultAddr),
 		ScanTimeout:     DefaultScanTimeout,
 		ShutdownTimeout: DefaultShutdownTimeout,
+		PreDrain:        DefaultPreDrain,
 		LogLevel:        valueOr(strings.ToLower(getenv(EnvLogLevel)), DefaultLogLevel),
 	}
 
@@ -131,6 +154,26 @@ func Load(getenv Getenv) (*Config, error) {
 		problems = append(problems, fmt.Errorf("%s: %w", EnvShutdownTimeout, err))
 	} else {
 		cfg.ShutdownTimeout = d
+	}
+
+	if raw := strings.TrimSpace(getenv(EnvPreDrain)); raw != "" {
+		d, err := time.ParseDuration(raw)
+		switch {
+		case err != nil:
+			problems = append(problems, fmt.Errorf(
+				"%s: must be a duration such as 5s", EnvPreDrain))
+		case d < 0:
+			problems = append(problems, fmt.Errorf(
+				"%s: must not be negative", EnvPreDrain))
+		case d > maxPreDrain:
+			// Longer than this and the pod is killed mid-drain by any
+			// reasonable termination grace period, which turns a fix for
+			// dropped requests into a cause of them.
+			problems = append(problems, fmt.Errorf(
+				"%s: must not exceed %s", EnvPreDrain, maxPreDrain))
+		default:
+			cfg.PreDrain = d
+		}
 	}
 
 	mode, err := policy.ParseMode(valueOr(strings.ToLower(getenv(EnvPolicyMode)), DefaultPolicyMode))

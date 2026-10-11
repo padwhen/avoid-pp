@@ -29,6 +29,7 @@ type Server struct {
 	http     *http.Server
 	listener net.Listener
 	drain    time.Duration
+	preDrain time.Duration
 	log      *slog.Logger
 	onDrain  func()
 }
@@ -39,6 +40,24 @@ type Options struct {
 	Handler http.Handler
 	Drain   time.Duration
 	Log     *slog.Logger
+
+	// PreDrain is how long to keep accepting requests after readiness has
+	// been failed and before the listener closes.
+	//
+	// Zero is right for a single process: there is nothing to tell. In an
+	// orchestrator it is the window that stops a rolling restart dropping
+	// requests, and C34 measured that window existing - 1 request of 40 was
+	// refused during a rollout, every time on a cold cluster.
+	//
+	// The sequence without it is: SIGTERM, fail readiness, close the
+	// listener, all in the same instant. Kubernetes has not yet noticed the
+	// readiness failure, let alone withdrawn the endpoint and updated every
+	// node's kube-proxy rules, so requests keep arriving at a socket that is
+	// already closed. The usual remedy is a preStop hook that sleeps, and
+	// this image is `scratch` with no shell to sleep with - so the wait
+	// belongs in the process, which is the better place for it anyway: the
+	// server knows it is draining, and a sidecar sleep only guesses.
+	PreDrain time.Duration
 
 	// ScanBudget is the longest a handler may legitimately take. It sizes
 	// the write deadline, which must outlast the work or a slow-but-valid
@@ -73,6 +92,7 @@ func New(opts Options) (*Server, error) {
 	}
 
 	return &Server{
+		preDrain: opts.PreDrain,
 		http: &http.Server{
 			Handler: opts.Handler,
 			// Bounds a slow or stalled client.
@@ -152,6 +172,17 @@ func (s *Server) Run(ctx context.Context) error {
 	if s.onDrain != nil {
 		s.onDrain()
 	}
+
+	// Still accepting, no longer advertised. Everything that arrives here is
+	// served normally; the only change is that readiness now says no, which
+	// is what the orchestrator needs time to act on.
+	if s.preDrain > 0 {
+		s.log.Info("gateway not ready, still serving", "budget", s.preDrain.String())
+		timer := time.NewTimer(s.preDrain)
+		defer timer.Stop()
+		<-timer.C
+	}
+
 	s.log.Info("gateway draining", "budget", s.drain.String())
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), s.drain)

@@ -1,0 +1,117 @@
+# The detector. Private by construction: a ClusterIP Service with no Ingress,
+# no NodePort and a NetworkPolicy that admits only the gateway.
+#
+# A detector reachable from anywhere in the cluster would let anything request
+# an assessment directly, bypassing the gateway's validation, rate limits,
+# admission control and policy - which is to say, bypassing the guard.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: detector
+  namespace: avoid-pp
+  labels: { app: detector }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: detector }
+  template:
+    metadata:
+      labels: { app: detector }
+    spec:
+      # No service account token. The detector calls the Kubernetes API never,
+      # and a mounted token is a credential sitting in a container that
+      # processes attacker-chosen text.
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile: { type: RuntimeDefault }
+      # Must exceed the time the process needs to finish in-flight work.
+      # uvicorn's own graceful shutdown is the bound here; 30 leaves room.
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: detector
+          # Built locally and loaded into the cluster. A registry deployment
+          # replaces this with a digest reference - a tag is a moving target
+          # and `imagePullPolicy: Never` below only makes sense for kind.
+          image: avoid-pp/detector:local
+          imagePullPolicy: Never
+          ports:
+            - name: http
+              containerPort: 9000
+          env:
+            - name: AVOIDPP_DETECTOR_MODE
+              value: fake
+            - name: AVOIDPP_DETECTOR_DETECTOR_VERSION
+              value: fake-0
+            # Above the gateway's bound, so the gateway sheds first. A
+            # rejection here means something is calling the detector
+            # directly, which is worth surfacing rather than absorbing.
+            - name: AVOIDPP_DETECTOR_MAX_ACTIVE
+              value: "8"
+            - name: AVOIDPP_DETECTOR_MAX_WAITING
+              value: "16"
+          envFrom:
+            - secretRef:
+                name: avoidpp-detector
+                # Fake mode needs no provider key, so a missing Secret must
+                # not block a deployment that will never call a provider.
+                optional: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            # readOnlyRootFilesystem is the point, and Python still wants
+            # somewhere to write. An emptyDir bounded by a size limit is
+            # writable and disappears with the pod, which is the behaviour a
+            # temp directory should have had all along.
+            - { name: tmp, mountPath: /tmp }
+          resources:
+            # Python plus FastAPI plus uvicorn has a floor around 100 MiB
+            # before any request arrives, which is most of this figure. The
+            # per-request cost is small: C32 measured the gateway at 26 KB
+            # per typical passage and the detector holds one passage per
+            # in-flight call, bounded by MAX_ACTIVE above.
+            requests: { cpu: 100m, memory: 160Mi }
+            limits: { cpu: "1", memory: 512Mi }
+          readinessProbe:
+            # /readyz is 503 until the detector has started successfully, so
+            # a pod that cannot reach its provider never receives traffic.
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            # /healthz answers whenever the process runs and makes no
+            # external call. A liveness probe that depended on the provider
+            # would restart this pod during a provider outage, which turns a
+            # degraded dependency into a crash loop.
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 10
+            failureThreshold: 3
+          startupProbe:
+            # Separate from liveness so a slow start is not a restart. The
+            # detector's start can involve a provider handshake in live mode.
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 2
+            failureThreshold: 30
+      volumes:
+        - name: tmp
+          emptyDir: { sizeLimit: 16Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: detector
+  namespace: avoid-pp
+spec:
+  # ClusterIP and nothing else. Not NodePort, not LoadBalancer: those are the
+  # two ways this becomes reachable from outside by a one-word edit.
+  type: ClusterIP
+  selector: { app: detector }
+  ports:
+    - name: http
+      port: 9000
+      targetPort: http

@@ -1,0 +1,56 @@
+# Default deny, then two exceptions.
+#
+# ## This is not enforced on every cluster
+#
+# NetworkPolicy is implemented by the CNI plugin, not by Kubernetes. A cluster
+# whose CNI ignores it accepts these objects, reports them present, and
+# enforces nothing - which is worse than having none, because `kubectl get
+# networkpolicy` then looks reassuring.
+#
+# kind's default CNI (kindnet) is one of those. deploy/kubernetes/smoke.sh
+# detects this and says so rather than reporting a pass it did not earn; it
+# installs Calico when asked, which does enforce.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: avoid-pp
+spec:
+  # Empty selector: every pod in the namespace.
+  podSelector: {}
+  policyTypes: [Ingress]
+  # No rules, so nothing is permitted except what the policies below add.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: detector-accepts-only-the-gateway
+  namespace: avoid-pp
+spec:
+  podSelector:
+    matchLabels: { app: detector }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { app: gateway }
+      ports:
+        - protocol: TCP
+          port: 9000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gateway-accepts-ingress
+  namespace: avoid-pp
+spec:
+  podSelector:
+    matchLabels: { app: gateway }
+  policyTypes: [Ingress]
+  ingress:
+    # Deliberately unrestricted by source: the gateway is the public entry
+    # point and authenticates its callers itself (C19). Narrowing this to an
+    # ingress controller's namespace is the right move once there is one.
+    - ports:
+        - protocol: TCP
+          port: 8080
