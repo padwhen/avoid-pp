@@ -1,38 +1,25 @@
 """Measure what a scan costs the provider, by input size.
 
-THIS SPENDS MONEY. It is never run by CI or by `make check`, and it requires
-an explicit confirmation flag.
+SPENDS MONEY. Never run by CI or `make check`, and requires confirmation.
 
     make provider-profile                 # refuses, prints an estimate
     make provider-profile CONFIRM=yes     # runs
-    make provider-profile CONFIRM=yes REPS=5
 
-## Why this exists separately from the Go harness
+C32-AC3 asks for provider work and gateway overhead separately.
+`gateway/internal/capacity` measures the gateway by injecting a known
+latency, so it cannot measure the provider at all - that is this.
 
-C32-AC3 asks for provider work and gateway overhead to be reported
-separately. `gateway/internal/capacity` measures the gateway by injecting a
-known provider latency, so everything above that latency is the gateway's. It
-cannot measure the provider at all - that is what this does.
+**By input size**, because the C26 run's 436 scans were all short: the corpus
+maximum is 510 characters against a contract ceiling of 32768. Those figures
+describe 1.6% of the supported range, and both latency and cost scale with
+input tokens.
 
-## Why by input size
+Three sizes, few repetitions. The point is the shape of the scaling, which a
+handful of calls at each end establishes well enough to size a timeout; a
+tight interval at one size would cost more than it tells us.
 
-The C26 run measured 436 real scans and every one of them was a short
-passage: the corpus maximum is 510 characters against a contract ceiling of
-32768. So the existing latency and cost figures describe 1.6% of the
-supported input range, and both latency and cost scale with input tokens.
-Capacity planning from those numbers alone would be planning for the easy
-case.
-
-Three sizes, few repetitions. The point is the *shape* of the scaling, which
-a handful of calls at each end establishes well enough to size a timeout
-with; a tight confidence interval on a latency at one size would cost more
-than it tells us.
-
-## The passages are built, not sampled
-
-The same fixed Finnish sentence the Go harness repeats. Sampling the corpus
-would make a benchmark depend on dataset contents, and reading the holdout to
-time a request would spend a one-time resource on a stopwatch.
+Passages are built from a fixed Finnish sentence, not sampled. Sampling would
+make a benchmark depend on dataset contents.
 """
 
 from __future__ import annotations

@@ -1,38 +1,28 @@
 """Does scanning a passage in pieces detect mixed-language attacks better?
 
-THIS SPENDS MONEY with --confirm. Never run by CI or by `make check`.
+SPENDS MONEY with --confirm. Never run by CI or `make check`.
 
     make segmented                 # refuses, prints an estimate
     make segmented CONFIRM=yes     # runs
     make check-segmented           # the combination rule, free
 
-## The comparison
-
 Full-passage labels are reused from the C37 challenge report rather than
-re-measured: same model, same prompt, same fingerprint, same corpus. Only
-the segmented arm costs anything, which also keeps the two arms honestly
-paired - a difference cannot come from the provider having a different day.
+re-measured - same model, prompt, fingerprint and corpus - so only the
+segmented arm costs anything, and a difference cannot come from the provider
+having a different day.
 
-## The combination rule, and why it fails closed
+**The combination rule fails closed.** A passage is suspicious if any segment
+is, uncertain if any is and none suspicious, clean only if every segment is.
+An error in any segment makes the whole scan an error, because a passage with
+an unscanned piece has not been scanned. Majority voting would let a short
+instruction be outvoted by the ordinary Finnish around it, which is the attack
+this project exists to catch.
 
-A passage is suspicious if *any* segment is suspicious; uncertain if any is
-uncertain and none suspicious; clean only if every segment is clean. An
-error in any segment makes the whole scan an error, because a passage with
-an unscanned piece has not been scanned.
-
-The alternative - majority vote, or weighting by length - would let a short
-instruction be outvoted by the ordinary Finnish around it, which is the
-attack this project exists to catch.
-
-## What the boundary probes are for
-
-C38-AC2 asks for boundary-spanning attacks. Segmentation's specific weakness
-is that an instruction split across two segments may look harmless in both
-halves, so the probes take reviewed corpus attacks and insert a sentence
-boundary into the middle of the instruction. Only punctuation is added; the
-Finnish and the embedded language are unchanged, so the passage's meaning is
-the reviewed one. They are diagnostics for the splitter, not corpus cases,
-and they are not added to the dataset.
+**Boundary probes** (C38-AC2) take reviewed attacks and push a sentence
+boundary into the middle of the instruction, so each half alone may look
+harmless. Only punctuation is added, so the meaning stays the reviewed one.
+They are diagnostics for the splitter, not corpus cases, and are not added to
+the dataset.
 """
 
 from __future__ import annotations

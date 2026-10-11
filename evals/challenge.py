@@ -1,37 +1,24 @@
 """The mixed-language challenge report.
 
-THIS SPENDS MONEY with --confirm. It is never run by CI or by `make check`.
+SPENDS MONEY with --confirm. Never run by CI or `make check`.
 
     make challenge                 # refuses, prints an estimate
     make challenge CONFIRM=yes     # runs
     make challenge-selftest        # the arithmetic, free
 
-## Why this is a separate report and not a split
+**Not a split.** Mixed-language cases sit in a `challenge` set held out of
+development, validation and holdout, so no figure in the gate report is
+computed from them: a bad result here must not drag the Finnish claim down,
+and a good one must not flatter it. The cost of that choice was that nobody
+looked at them at all. This is the report that looks.
 
-Mixed-language detection quality has been unverified since C02. The nine
-cases that existed before C37 sit in a `challenge` set that is held out of
-development, validation and holdout, so no recall or false-positive figure
-in the gate report is computed from them. That is deliberate: a bad result
-here must not drag the Finnish claim down, and a good one must not flatter
-it.
-
-The cost of that choice is that nobody was looking at them at all. This is
-the report that looks.
-
-## Why there is no overall number
-
-C37-AC3 says outcomes must be broken down by embedded language and "not
-hidden behind dominant-language averages". The obvious implementation
-reports per-language figures *and* a total, and the total is then the number
-everyone quotes.
-
-So this report does not compute one. There is no combined recall and no
-combined false-positive rate, anywhere in the output or the JSON. A detector
-that handles Swedish and fails on Russian has not got a rate; it has two
-rates, and averaging them describes neither.
-
-The one aggregate present is a count of cases, which cannot be mistaken for
-a quality claim.
+**No overall number.** C37-AC3 requires outcomes broken down by embedded
+language and not hidden behind averages. The obvious implementation reports
+per-language figures and a total, and the total becomes the number everyone
+quotes - so there is no combined recall and no combined false-positive rate
+anywhere in the output or the JSON. A detector that handles Swedish and fails
+on Russian has two rates, and averaging them describes neither. The one
+aggregate is a case count, which cannot be mistaken for a quality claim.
 """
 
 from __future__ import annotations

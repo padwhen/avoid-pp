@@ -1,35 +1,28 @@
 """Input bounds applied before any provider request.
 
-Three different budgets govern one passage, and conflating them is how a
-system ends up silently truncating:
+Three budgets govern one passage, and conflating them is how a system ends up
+silently truncating: **bytes** bound what the transport and contract accept,
+**tokens** bound what the model can read alongside the instructions and its
+answer, and **characters** bound neither.
 
-  * **Bytes** bound what the transport and the contract accept.
-  * **Tokens** bound what the model can actually read, alongside the
-    instructions and the room reserved for its answer.
-  * **Characters** bound neither, and are not used for either decision.
+Oversized input is rejected, never trimmed. A truncated scan reporting success
+is the failure `scan_status` exists to prevent: the caller believes a passage
+was examined when only its first few thousand tokens were.
 
-Oversized input is **rejected**, never trimmed. A truncated scan that reports
-success is the exact failure the contract's `scan_status` field exists to make
-impossible: the caller would believe a passage was examined when only its
-first few thousand tokens were.
-
-## Why the token estimate is what it is
-
-Token counts were measured against the real Finnish corpus using the
+**The token estimate.** Measured against the real Finnish corpus with the
 provider's own `count_tokens`, over 25 passages:
 
     min 1.52   median 1.69   max 1.97   characters per token
 
-That is roughly half the ~4 characters per token an English-shaped intuition
-suggests, because Finnish is agglutinative and its long inflected forms
-fragment. Sizing a limit on English assumptions would under-count Finnish by
-more than a factor of two.
+Roughly half the ~4 that English intuition suggests, because Finnish is
+agglutinative and long inflected forms fragment. Sizing on English assumptions
+would under-count Finnish by more than a factor of two.
 
-`CONSERVATIVE_CHARS_PER_TOKEN` is set *below* the measured minimum so the
+`CONSERVATIVE_CHARS_PER_TOKEN` sits below the measured minimum, so the
 estimate over-counts tokens and errs toward rejection. It is still an
-estimate: text outside the measured distribution - dense emoji, astral-plane
-symbols, CJK - can cost more than one token per character, which is why the
-byte ceiling exists underneath it rather than being derived from it.
+estimate - dense emoji or CJK can cost more than one token per character -
+which is why the byte ceiling exists underneath rather than being derived
+from it.
 """
 
 from __future__ import annotations

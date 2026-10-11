@@ -305,43 +305,34 @@ type wireResponse struct {
 
 // ParseVerdict turns a 200 body into a Verdict, or reports why it will not.
 //
-// The checks run in a fixed order, and the order is the contract's reasoning
-// rather than convenience:
+// The order of the checks is the contract's reasoning, not convenience:
 //
-//  1. Shape. A body that is not an object carrying the required fields is not
-//     a scan response. An error envelope served with 200 lands here, which is
-//     what a proxy rewriting a status looks like.
+//  1. Shape. A body without the required fields is not a scan response - an
+//     error envelope served with 200 lands here, which is what a proxy
+//     rewriting a status looks like. Absent field: missing_field. Wrong JSON
+//     type: unreadable_body, because this decoder cannot get far enough to
+//     say more. The Python client states the same rule; without it the two
+//     classified the same malformed response differently, which is the
+//     divergence the shared expectations table caught.
 //
-//     A field that is absent is a missing field; a field carrying the wrong
-//     JSON type makes the whole body unreadable, because this decoder cannot
-//     get far enough to say anything more specific. The Python client states
-//     the same rule explicitly - without it the two would classify the same
-//     malformed response differently, which is the divergence the shared
-//     expectations table exists to catch, and did.
+//  2. Status. scan_status has one legal value.
 //
-//  2. Status. scan_status has one legal value; anything else forbids a clean
-//     verdict, so there is no verdict to read.
+//  3. Coverage. A verdict about a different number of bytes is not about what
+//     was sent. This is why the client, not every caller, carries the
+//     scan-translate divergence problem.
 //
-//  3. Coverage. A scan of part of a passage is not a verdict about the
-//     passage, and a verdict about a different number of bytes is not about
-//     what was sent. This check is why the client, rather than every caller,
-//     carries the scan-translate divergence problem.
+//  4. Label. An unrecognised label is refused: step 6 cannot check
+//     consistency against a meaning it does not know, and an unknown label is
+//     not a fourth kind of clean.
 //
-//  4. Label. An unrecognised label is refused outright, because the
-//     consistency check in step 6 cannot be performed against a label whose
-//     meaning is unknown. An unknown label is not a fourth kind of clean.
+//  5. Action. An unrecognised action becomes ActionBlock. The contract says
+//     so explicitly, so the enum can grow without deployed clients failing
+//     closed into an outage.
 //
-//  5. Action. An unrecognised action becomes ActionBlock. This is the one
-//     place the contract tells clients what to do with data they cannot
-//     understand, and it says so explicitly, so the enum can grow without
-//     every deployed client failing closed into an outage.
-//
-//  6. Consistency, in one direction only. A non-clean label with an allow
-//     action is the exact failure this service exists to prevent, arriving as
-//     a well-formed response; it is refused. The mirror case - a clean label
-//     blocked anyway - is honoured, because a server stricter than its own
-//     schema is not a safety problem, and overriding it would be this client
-//     second-guessing a server-side decision.
+//  6. Consistency, one direction only. A non-clean label with an allow action
+//     is refused - it is the exact failure this service prevents, arriving as
+//     a well-formed response. A clean label blocked anyway is honoured: a
+//     server stricter than its schema is not a safety problem.
 func ParseVerdict(body []byte, sentText string) (Verdict, error) {
 	var wire wireResponse
 	if err := json.Unmarshal(body, &wire); err != nil {

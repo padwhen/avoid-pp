@@ -1,54 +1,30 @@
 """Enforce the scan decision before translating.
 
-## The property that is hard to get right
+"Scan the text, then translate the text" is easy to get subtly wrong, because
+nothing in that sentence says the two texts are the same one. A trim before
+display, a retry carrying an edit, an excerpt scanned and a document
+translated - in each case the scan was real and the text that reached the
+translator was never examined.
 
-"Scan the text, then translate the text" is easy to write and easy to get
-subtly wrong, because nothing in that sentence says the two texts are the same
-one. Every realistic bug here is a divergence between them:
+So the decision is not a boolean travelling alongside the text. It is a ticket
+bound to a digest of the exact bytes scanned, and translating requires a
+ticket whose digest matches. That makes C28-AC3 structural rather than a rule
+someone has to remember.
 
-  * the frontend trims whitespace before display but sends the original to be
-    scanned, then the trimmed version to be translated;
-  * a retry re-sends a slightly edited passage and reuses the earlier verdict;
-  * a caller scans a short excerpt and translates the whole document;
-  * a normalisation step runs between the two calls.
-
-In each case the scan was real and the verdict was honest, and the text that
-reached the translator was never examined. The guard did its job and protected
-nothing.
-
-So the decision is not a boolean that travels alongside the text. It is a
-**ticket bound to a digest of the exact bytes that were scanned**, and
-translation requires a ticket whose digest matches the text being translated.
-A modified source cannot be translated under an old verdict, because the
-digest no longer matches - which makes C28-AC3 a structural property rather
-than a rule someone has to remember.
-
-## Three outcomes, not two
-
-C27's live run found that the provider's own safety system refuses some
-passages the detector correctly clears as material to translate. So an allow
-decision does not guarantee a translation, and the integration has to
-distinguish:
+Three outcomes, not two:
 
     BLOCKED      the guard decided this must not be translated
-    TRANSLATED   the guard allowed it and the translator produced text
-    UNAVAILABLE  the guard allowed it and no translation was produced
+    TRANSLATED   allowed, and the translator produced text
+    UNAVAILABLE  allowed, and no translation was produced
 
-The third must be visibly distinct from the first. "We refused to translate
-this" and "we were unable to translate this" are different statements to make
-to a user, and collapsing them would hide a provider outage behind a security
-message - or worse, make a security block look like a transient failure worth
-retrying.
+The third exists because C27 found the provider refuses some passages the
+detector correctly clears. "We refused" and "we could not" are different
+things to tell a user, and merging them hides an outage behind a security
+message.
 
-## Why the frontend's opinion is ignored
-
-A request may arrive carrying a verdict, a `safe: true` flag, a prior scan id,
-or a `skip_scan` parameter. All of it is ignored, and not because it is
-untrusted in the usual sense: the frontend may be perfectly honest. It is
-ignored because a decision made anywhere other than this server, from a scan
-performed by this server, is not a decision this server can stand behind.
-
-An attacker who can set `safe: true` does not need an injection.
+Anything the request claims about a prior scan - a verdict, `safe: true`, a
+`skip_scan` flag - is ignored. Not because the frontend is dishonest, but
+because a decision this server did not make is not one it can stand behind.
 """
 
 from __future__ import annotations

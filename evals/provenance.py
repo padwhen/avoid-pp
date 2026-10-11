@@ -1,88 +1,27 @@
 """Pin the inputs a published report is a claim about.
 
-## The problem this exists for
+A whole-file digest answers "did any byte change", which is not the question.
+"Is this measurement still about the current dataset?" depends only on what
+the detector saw and the labels it was scored against.
 
-The C26 measurement records the dataset it ran on as
-``50cfb7ce...``. The frozen split manifest records ``3484a8af...``. The file
-on disk today is ``ed1439b6...``. Three digests, one dataset, and at first
-glance a report whose provenance has evaporated.
+So the scored-content digest covers `id`, `text`, `expected_label`,
+`category` and `deferred_quality`, and nothing else. Annotation fields,
+reference translations and outcome labels are excluded on purpose: filling one
+in must not invalidate a detection result. `group` is excluded because split
+membership is pinned harder elsewhere - the manifest lists every case id per
+split, so a moved case changes that digest instead.
 
-Nothing is wrong. Between the measurement and today, seven cases moved from
-``pending_review`` to ``reviewed`` and 161 reference translations were filled
-in. Not one character of any passage, label, or category changed - the diff
-confirms it. But a whole-file digest cannot say that, so it says the only
-thing it can: the bytes differ.
+Split digests matter as much as the corpus digest. The gate report's numbers
+are about the development split; adding sixty cases to the challenge set at
+C37 changed the corpus digest and changed neither split. The corpus digest
+still moves on any content change, which is how a report notices it describes
+an older corpus.
 
-That is the wrong granularity for the question a report needs answered. "Is
-this measurement still a claim about the current dataset?" does not depend on
-annotation fields. It depends on the inputs the detector saw and the labels it
-was scored against, and on nothing else.
+`verify_scored_cases` replays every per-case record in the cited reports
+against the corpus: each case still exists and still carries the label it was
+scored against. That is the check that supports the published numbers.
 
-## What a content digest covers
-
-``id``, ``text``, ``expected_label``, ``category``, ``deferred_quality``. That
-is the whole of what a detection metric reads.
-
-Deliberately excluded:
-
-  * ``expected_english``, ``expected_outcome`` - these feed outcome grading
-    (C29), not detection scoring, and filling one in must not invalidate a
-    detection result;
-  * ``review_status``, ``rights``, ``notes`` - annotation;
-  * ``group`` - it decides split membership, and membership is pinned harder
-    elsewhere: the frozen manifest lists every case id per split, so a moved
-    case changes that manifest's digest rather than hiding here.
-
-So a content digest that still matches means the measurement describes the
-same passages, scored against the same labels, as the dataset holds now. A
-content digest that has changed means a published number is about text that no
-longer exists, and the report has to be re-derived.
-
-## The digest that cannot be resolved at all
-
-The C26 report's recorded dataset digest, ``50cfb7ce...``, matches no
-committed state of the file. The reason is mundane and worth writing down: the
-run found two passages the provider refuses to process, and those findings
-were written back into the corpus as ``notes`` before the commit. So the
-digest describes a working tree that existed for about twenty minutes and was
-never saved.
-
-A whole-file digest is therefore not only the wrong granularity, it is a
-provenance claim that can stop being checkable through ordinary, correct work.
-
-What *is* checkable is stronger and more to the point. Every report in this
-project records ``id``, ``category``, ``expected_label`` and
-``deferred_quality`` per scored case, so each one can be replayed against the
-corpus as it stands: every case it scored still exists, and still carries the
-label it was scored against. :func:`verify_scored_cases` does that for all 662
-case records across the cited reports, and it is the check that actually
-supports the published numbers.
-
-The remedy for new runs is in this module rather than in prose: record the
-scored-content digest, which does not move when an annotation does.
-
-## The corpus can grow without invalidating a measurement
-
-A whole-corpus digest answers "has anything changed", and that is not quite
-the question. The gate report's numbers are about the *development split*;
-the holdout's protection is about the *holdout split*. Adding sixty
-mixed-language cases to the challenge set at C37 changed the corpus digest
-and changed neither.
-
-The first time that happened this check failed, correctly and unhelpfully:
-it said a passage had changed when what had happened was that passages had
-been added somewhere the measurement does not look.
-
-So the manifest pins both. The corpus digest still moves on any content
-change, which is right - it is how a report notices it is describing an
-older corpus. The *split* digests are the stronger claim, and they are what
-make "the measured cases are unchanged" checkable rather than argued.
-
-## Why this is a check and not a note
-
-A report that says "the corpus has not changed in any way that matters" is
-making a claim that decays silently. ``make check-gate-report`` recomputes it
-on every commit, so the claim either holds or the build fails.
+Run by `make check-gate-report`, so the claim either holds or the build fails.
 """
 
 from __future__ import annotations

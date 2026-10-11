@@ -1,38 +1,25 @@
 """Group-aware development, validation and holdout splits.
 
-## The property everything else depends on
+**A split must stay stable as the corpus grows.** If assignment depended on
+the number of cases or their order in the file, adding passages would reshuffle
+the existing ones, and a case in the holdout last week would be in development
+this week. The holdout's only guarantee is "this was never used to tune
+anything", and that cannot survive a case moving.
 
-A split must be **stable as the corpus grows**. If assignment depended on the
-number of cases, or on their order in the file, then adding a hundred passages
-would reshuffle the existing ones - and a case that was in the holdout last
-week would be in development this week. The holdout would be worthless,
-because its guarantee is "this was never used to tune anything", and that
-guarantee cannot survive a case moving.
+So assignment is a pure function of the group name: hash it, take the
+remainder. Adding cases never moves a group; only renaming one does, and that
+is a visible edit.
 
-So assignment is a pure function of the **group name**: hash it, take the
-remainder. Adding cases never moves an existing group, and the only thing that
-can move a group is renaming it, which is a visible edit.
+**Groups rather than cases**, because variants of one attack must land
+together. The corpus has matched pairs - the same sentence bare and quoted,
+differing only in framing. Bare in development and quoted in the holdout
+means tuning on the first is tuning on the second, and the holdout would
+measure a case the prompt had effectively already seen.
 
-## Why groups rather than cases
-
-Variants of one source or one attack family must land in the same split.
-
-The seed corpus contains matched pairs: the same attack sentence bare and
-quoted, differing only in framing. If the bare half were in development and
-the quoted half in the holdout, then tuning on the first would be tuning on
-the second - the holdout would be measuring a case the prompt had effectively
-already seen, and it would look like generalisation.
-
-Near-duplicates have the same problem in weaker form, which is why the
-duplicate report exists alongside this.
-
-## The challenge set is not a split
-
-Deferred-quality cases - a Finnish wrapper around a non-Finnish attack span -
-are held out of all three splits rather than distributed among them. Their
-detection quality is unverified by the threat model, so they must not reach a
-headline metric from any split. They are a separately identified challenge
-set, which is what C26-AC3 asks for.
+**The challenge set is not a split.** Deferred-quality cases are held out of
+all three rather than distributed among them: their detection quality is
+unverified by the threat model, so they must not reach a headline metric from
+any split (C26-AC3).
 """
 
 from __future__ import annotations

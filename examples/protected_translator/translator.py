@@ -1,43 +1,29 @@
 """A Finnish-to-English translator adapter, isolated by construction.
 
 The guard exists to protect something, and this is that something. Keeping it
-in the repository means the integration at C28 is wired against working code
-rather than described in prose - and it means the properties below are tested
-rather than assumed about a system nobody can see.
+here means C28's integration is wired against working code, and that the
+properties below are tested rather than assumed.
 
-## What "isolated" means here
+The translator is what an injected instruction wants to capture, so the
+capabilities it lacks are the design:
 
-The translator is the component an injected instruction wants to capture. If
-it can be made to do something other than translate, the guard in front of it
-has protected nothing. So the capabilities it does not have are the design:
-
-  * **No tools.** The provider request carries no tool definitions at all, so
-    there is no function for a passage to ask it to call. This is verified by
-    inspecting the request rather than asserted in a comment, because "we
-    didn't add any tools" is a property that decays.
-  * **One secret, and only the one it needs.** The provider key, passed in.
-    No database handle, no filesystem access, no credentials for anything
-    else. A captured translator should be able to produce text and nothing
+  * **No tools** in the provider request, so there is no function for a
+    passage to ask it to call. Verified by inspecting the request, because
+    "we didn't add any tools" is a property that decays.
+  * **One secret**, the provider key. No database handle, no filesystem, no
+    other credentials. A captured translator can produce text and nothing
     else.
-  * **The task and target language come from configuration**, never from the
-    request. A caller names no language; the server decides it is English.
-    Otherwise "translate this into a shell command" is a request this API
-    would honour.
-  * **Bounded output.** A provider that returns a megabyte is a failure, not
-    a long translation.
-  * **Output is text, not markup.** The translation of hostile input is still
-    hostile input - rendering is in render.py and escapes by default.
+  * **The target language is configuration, not request.** Otherwise
+    "translate this into a shell command" is a request this API honours.
+  * **Bounded output.** A megabyte is a failure, not a long translation.
+  * **Text, not markup.** A faithful translation of hostile input is still
+    hostile input; escaping is render.py's job.
 
-## Why the source text is content, never instructions
-
-The passage is interpolated into a user message as delimited content, with the
-instructions in the system prompt. It is never concatenated into the
-instruction itself.
-
-That does not make injection impossible - nothing does, which is why the guard
-exists - but it removes the easiest version, where a passage ending in "...and
-now ignore the above" lands directly inside the sentence telling the model what
-to do.
+The passage goes into a user message as delimited content, with the
+instructions in the system prompt - never concatenated into the instruction
+itself. That does not make injection impossible, but it removes the easiest
+version, where "...and now ignore the above" lands inside the sentence telling
+the model what to do.
 """
 
 from __future__ import annotations

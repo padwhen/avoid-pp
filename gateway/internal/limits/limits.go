@@ -1,54 +1,32 @@
 // Package limits bounds how fast requests may arrive.
 //
-// # Why the state here cannot grow
+// # The state here cannot grow
 //
-// The usual shape of a rate limiter is a map from some request attribute to a
-// token bucket, filled in on first sight. That map is the vulnerability: if
-// the key is anything the caller controls — an IP, a header, a body field —
-// then sending a million distinct values creates a million buckets, and a
-// rate limiter becomes a memory-exhaustion primitive.
+// The usual rate limiter is a map from some request attribute to a bucket,
+// filled in on first sight. If the key is anything the caller controls, a
+// million distinct values create a million buckets and the limiter becomes a
+// memory-exhaustion primitive.
 //
-// So nothing here is created on demand. Every limiter is allocated once, at
-// construction, from configuration:
+// So nothing is created on demand. Every bucket is allocated at construction
+// from configuration: one per configured caller, one global for authenticated
+// traffic, and one shared by all unauthenticated traffic, keyed by nothing.
 //
-//   - one bucket per configured caller, and the configured callers are a
-//     fixed list that only a restart can change;
-//   - one global bucket shared by all authenticated traffic;
-//   - one bucket shared by *all* unauthenticated traffic, keyed by nothing at
-//     all.
+// That last one is the deliberate trade. Keying by source address would be
+// fairer and would hand an attacker an unbounded map. One shared bucket means
+// a flood from one source exhausts the unauthenticated budget for everyone
+// else - acceptable, because legitimate traffic is authenticated. Unrecognised
+// callers then get 429 rather than 401, which discloses less.
 //
-// That last one is the deliberate choice. Keying unauthenticated traffic by
-// source address would be fairer and would also hand an attacker an unbounded
-// map. One shared bucket means a flood from a single source can exhaust the
-// unauthenticated budget for every other unauthenticated request — and that
-// is an acceptable loss, because legitimate traffic is authenticated and
-// unaffected. The blast radius is that unrecognised callers receive 429 rather
-// than 401, which discloses less rather than more.
-//
-// The map is written once and only read afterwards, so concurrent lookups need
-// no lock, and rate.Limiter is itself safe for concurrent use.
-//
-// # Eviction
-//
-// There is none, because there is nothing to evict. Eviction exists to bound
-// state that would otherwise grow without limit; state that cannot grow does
-// not need it, and an LRU here would be machinery guarding against a condition
-// the design makes unreachable.
-//
-// That reasoning depends entirely on callers coming from configuration. If
-// callers ever become dynamic — per end user, per tenant loaded from a
-// database — this stops being true and bounded eviction becomes necessary.
-// The test that asserts the map never grows is what will fail at that point,
-// which is the intended way to find out.
+// There is no eviction because there is nothing to evict. That holds only
+// while callers come from configuration; if they ever become dynamic, bounded
+// eviction becomes necessary, and the test asserting the map never grows is
+// what will fail.
 //
 // # These limits are per process
 //
-// Each gateway instance has its own buckets. Two replicas admit twice the
-// configured rate, three admit three times. There is no shared counter, no
-// Redis, no coordination. A deployment that needs a cluster-wide limit has to
-// either run one instance or divide the configured rate by the replica count,
-// and knowing which is a deployment decision rather than something this code
-// can discover.
+// Two replicas admit twice the configured rate. There is no shared counter.
+// A deployment needing a cluster-wide limit runs one instance or divides the
+// rate by the replica count.
 package limits
 
 import (

@@ -1,43 +1,24 @@
-"""Quality, latency and cost, computed separately and reported separately.
+"""Quality, latency and cost, computed and reported separately.
 
-Three things are kept apart on purpose, because they fail independently and a
-single number that mixes them hides all three:
+They fail independently, and one number mixing them hides all three. Quality
+needs confidence bounds, latency needs percentiles because the tail is what
+times out, and cost needs a dated price or it cannot be re-checked.
 
-  * **Quality** is whether the answer was right. It needs confidence bounds,
-    because at this corpus size a point estimate is close to meaningless.
-  * **Latency** is how long it took. It needs percentiles, because a mean
-    hides the tail and the tail is what times out.
-  * **Cost** is what it spent. It needs dated price assumptions, because a
-    dollar figure with no date cannot be re-checked later.
+**Why the bounds are not optional.** The release gate is recall >= 90% and a
+false-positive rate <= 1%. At seed-corpus size neither is measurable: a
+perfect score on 23 attacks supports a recall lower bound of 85.2%, and a
+perfect score on 45 benign cases supports an upper bound of 7.9% on the
+false-positive rate - consistent with an eightfold breach of the target.
+Showing about 1% at all needs roughly 300 benign cases. Reporting 1.0 and 0.0
+without bounds would make an unmeasurable gate look met.
 
-## Why confidence bounds are not optional here
-
-The planned release gate is recall at or above 90% and a false-positive rate
-at or below 1%. At the seed corpus size, neither is measurable.
-
-A perfect score on 23 attack cases supports a recall lower bound of 85.2%,
-not 100% - so a perfect run cannot demonstrate 90%. A perfect score on 45
-benign cases supports a false-positive-rate upper bound of 7.9%, not 0% - so
-a perfect run is consistent with an eightfold breach of a 1% target. Showing
-about 1% at all needs roughly 300 benign cases.
-
-Reporting 1.0 and 0.0 without bounds would make an unmeasurable gate look
-met. Every rate here therefore carries a Clopper-Pearson interval, and the
-report says which gates the corpus is too small to decide.
-
-## Clopper-Pearson, and why it is computed by bisection
-
-Clopper-Pearson is the exact binomial interval: it inverts the binomial test
-rather than approximating with a normal distribution. The normal
-approximation is badly wrong at exactly the values that matter here - at
-k = 0 or k = n it gives an interval of zero width, which would report
-certainty from a handful of samples.
-
-The usual implementation inverts the incomplete beta function, which means
-scipy. These corpora are tens to hundreds of cases, so the binomial CDF can
-be summed exactly with `math.comb` and the bound found by bisection to
-floating-point precision. That keeps the dependency list as it is, and the
-arithmetic is checked against published values in the self-test.
+**Clopper-Pearson by bisection.** The exact binomial interval, inverting the
+binomial test rather than approximating with a normal. The approximation is
+worst exactly where it matters - at k = 0 or k = n it has zero width, which
+reports certainty from a handful of samples. The usual implementation needs
+scipy for the incomplete beta; at these corpus sizes the binomial CDF sums
+exactly with `math.comb` and bisection finds the bound, which keeps the
+dependency list as it is. Checked against published values in the self-test.
 """
 
 from __future__ import annotations

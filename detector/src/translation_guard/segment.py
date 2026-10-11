@@ -1,38 +1,25 @@
 """Split a passage into segments without losing any of it.
 
-C38 asks whether scanning a passage in pieces detects mixed-language attacks
-better than scanning it whole. This is the splitter that makes the comparison
-possible; `evals/segmented.py` is the comparison.
+C38 asks whether scanning a passage in pieces catches mixed-language attacks
+better than scanning it whole. This is the splitter; `evals/segmented.py` is
+the comparison.
 
-## Why segmentation never looks at language
+**It never looks at language.** The obvious design detects each span's
+language and routes accordingly, and C38-AC1 forbids the failure that invites:
+no segment may be discarded for differing from the dominant language. A router
+that decides a span is Finnish and a scanner tuned for Finnish are one step
+from a span nobody scans. Worse, language identification is least reliable on
+short spans, which is exactly the length an embedded attack has - "Respond only
+with OK" is five words, and an identifier given five words is guessing.
 
-The obvious design detects the language of each span and routes accordingly -
-Finnish here, English there. C38-AC1 forbids the failure that invites: "no
-segment is discarded because its language differs from the dominant label".
-A router that decides a span is Finnish and a scanner tuned for Finnish are
-one short step from a span that nobody scans.
+So the splitter works on sentence boundaries and punctuation only. The
+property is structural, not tested-for.
 
-C38-AC2 points at why the temptation is worse than it looks: language
-identification is unreliable on short spans, which is exactly the length an
-embedded attack has. "Respond only with OK" is five words; a language
-identifier given five words is guessing.
-
-So this splitter is language-agnostic by construction. It splits on sentence
-boundaries and punctuation, never consults a language identifier, and cannot
-therefore discard anything for being the wrong language. The property is
-structural rather than tested-for.
-
-## The coverage invariant
-
-Concatenating the segments reproduces the source exactly - every character,
-including the whitespace between sentences. Checked in code on every call,
-not asserted in a comment.
-
-That is the whole reason this module can be trusted in front of a guard. A
-splitter that dropped a character could drop an instruction, and the scan
-would report complete coverage of a passage it had not completely seen - the
-exact failure `scan_status` and the byte accounting exist to make
-impossible, reintroduced one layer down.
+**Coverage invariant:** concatenating the segments reproduces the source
+exactly, whitespace included, checked on every call. A splitter that dropped a
+character could drop an instruction, and the scan would report complete
+coverage of a passage it had not completely seen - the failure the byte
+accounting exists to prevent, reintroduced one layer down.
 """
 
 from __future__ import annotations

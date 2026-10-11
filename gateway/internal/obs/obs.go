@@ -1,35 +1,30 @@
 // Package obs provides logging that cannot emit what it should not.
 //
-// The gateway's log calls were already careful — passages are never passed to
-// slog, and credentials never were. But "careful" is a property of the people
-// writing call sites, and it expires the first time someone adds a field in a
-// hurry. An allowlist moves the guarantee from discipline to structure: the
-// handler emits the keys it knows about and drops the rest, so a well-meant
+// The log calls were already careful, but "careful" is a property of the
+// people writing call sites and it expires the first time someone adds a
+// field in a hurry. An allowlist moves the guarantee from discipline to
+// structure: the handler emits the keys it knows and drops the rest, so
 //
 //	log.Info("scan failed", "text", req.Content.Text)
 //
-// produces a log line without the passage, and names `text` as dropped so the
-// author finds out immediately rather than after the text is in a log
-// aggregator somewhere.
+// produces a line without the passage, and names `text` as dropped so the
+// author finds out now rather than after it reaches a log aggregator.
 //
-// # Why drop rather than redact
+// # Drop rather than redact
 //
-// Replacing a value with "[redacted]" requires knowing which values are
-// sensitive, which is the judgment that fails. A key the handler has never
-// heard of is dropped whatever it holds, so a field added without thought is
-// absent rather than present-and-hopefully-harmless.
-//
-// Keys are developer-written constants, so naming a dropped key discloses
-// nothing. Values are the part that can come from a request.
+// Redacting requires knowing which values are sensitive, which is the
+// judgment that fails. An unknown key is dropped whatever it holds, so a
+// field added without thought is absent rather than present-and-hopefully-
+// harmless. Keys are developer-written constants, so naming a dropped one
+// discloses nothing; values are the part that comes from a request.
 //
 // # Error values
 //
-// An error's message is not loggable by default. Go error strings routinely
-// wrap the thing that failed — `fmt.Errorf("decode %q: %w", body, err)` is
-// ordinary code — and the detector client's own errors embed status codes and
-// parser messages. So an `error` attribute is reduced to its chain of
-// sentinel identities via ErrorChain, which says what happened without
-// quoting what it happened to.
+// An error's message is not loggable. Go error strings routinely wrap the
+// thing that failed - `fmt.Errorf("decode %q: %w", body, err)` is ordinary
+// code - so an `error` attribute is reduced to its chain of sentinel
+// identities via ErrorChain, which says what happened without quoting what it
+// happened to.
 package obs
 
 import (
