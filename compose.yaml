@@ -6,9 +6,10 @@
 #     only from the gateway over the internal network. A detector exposed to
 #     the host would let anything on the machine request an assessment
 #     directly, bypassing the gateway's validation, limits and policy.
-#   * Everything runs in fake mode. No provider credential is read, and no
-#     paid API is called. Live inference arrives at C13 behind its own
-#     configuration.
+#   * This file runs everything in fake mode. No provider credential is read
+#     and no paid API is called, so `make up` is free and needs no key.
+#     Live inference is `compose.live.yaml`, an overlay that has to be named
+#     to take effect - see `make up-live`.
 #   * The gateway's caller credentials have no default. There is no key in
 #     this file to forget to change; `make dev-key` generates one into the
 #     gitignored .env, and Compose refuses to start without it.

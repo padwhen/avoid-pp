@@ -223,7 +223,17 @@ Fake is the default: no key, no spend, and that is what CI runs. Live is opt-in.
 ```sh
 AVOIDPP_DETECTOR_MODE=live make run-detector   # needs LLM_API_KEY in .env
 make live-smoke CONFIRM=yes                    # 4 real requests, costs money
+
+make up-live                   # the whole stack, detector calling the provider
+make smoke-live CONFIRM=yes    # two real scans through the gateway, ~USD 0.018
 ```
+
+`make up` runs the detector in fake mode, which is what makes it free; live
+inference is a Compose overlay that has to be named to take effect. Both
+scans in `make smoke-live` assert the detector identity as well as the
+verdict, because a fake verdict and a live one are both well-formed 200s and
+a smoke test that checked only the label would pass just as happily against
+the stack it exists to prove is not running.
 
 The request uses structured outputs rather than tool use, so no tool
 definitions are exposed for a passage to aim at, and the passage travels as

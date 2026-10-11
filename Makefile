@@ -23,7 +23,7 @@ DETECTOR_HOST ?= 127.0.0.1
 DETECTOR_PORT ?= 9000
 
 .DEFAULT_GOAL := help
-.PHONY: local-bench segmented check-segmented challenge challenge-selftest check-docs-env deploy-smoke deploy-runbooks capacity provider-profile check-gate-report provenance check-sdk check-sdk-go check-sdk-python demo check-examples live-translate splits splits-freeze duplicates audit check-splits check-duplicates ingest help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner dev-key run-gateway run-detector up down logs smoke live-smoke live-eval
+.PHONY: up-live smoke-live local-bench segmented check-segmented challenge challenge-selftest check-docs-env deploy-smoke deploy-runbooks capacity provider-profile check-gate-report provenance check-sdk check-sdk-go check-sdk-python demo check-examples live-translate splits splits-freeze duplicates audit check-splits check-duplicates ingest help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner dev-key run-gateway run-detector up down logs smoke live-smoke live-eval
 
 help:
 	@printf '%s\n' \
@@ -65,6 +65,8 @@ help:
 	  'make run-detector  Run the detector locally in fake mode (no API key)' \
 	  'make up            Build and start both services with Compose' \
 	  'make smoke         Exercise the running stack and assert the responses' \
+	  'make up-live       Start the stack with the detector calling the real provider' \
+	  'make smoke-live    One real scan through the running stack (COSTS MONEY)' \
 	  'make logs          Follow Compose logs' \
 	  'make down          Stop and remove the Compose stack' \
 	  'make live-smoke    Call the real provider (COSTS MONEY; needs CONFIRM=yes)' \
@@ -277,6 +279,26 @@ up:
 	AVOIDPP_RATE_UNAUTHENTICATED=$${AVOIDPP_RATE_UNAUTHENTICATED:-$(DEV_RATE_UNAUTH)} \
 	docker compose up -d --build
 	@printf 'gateway: http://localhost:%s\n' "$${AVOIDPP_HOST_PORT:-8099}"
+
+# The same stack with the detector calling the real provider. Separate
+# target, because every scan through it costs about USD 0.009 and `make up`
+# is the command people run without thinking.
+up-live:
+	@test -f .env || { echo 'no .env; run `make dev-key` first' >&2; exit 1; }
+	@grep -q '^LLM_API_KEY=' .env || { echo 'no LLM_API_KEY in .env' >&2; exit 1; }
+	@printf 'LIVE MODE: every scan calls the provider, about USD 0.009 each.\n'
+	@printf 'rate limits: caller %s, global %s (a spend bound, left tight)\n' \
+	  "$${AVOIDPP_RATE_CALLER:-1/5}" "$${AVOIDPP_RATE_GLOBAL:-2/10}"
+	docker compose -f compose.yaml -f compose.live.yaml up -d --build
+	@printf 'gateway: http://localhost:%s (live)\n' "$${AVOIDPP_HOST_PORT:-8099}"
+
+# One real scan end to end: through the gateway, through the live detector,
+# back as a verdict. Needs `make up-live` and CONFIRM=yes.
+smoke-live:
+	@test -f .env || { echo 'no .env; run `make dev-key` first' >&2; exit 1; }
+	set -a && . ./.env && set +a && \
+	  ./scripts/smoke-live.sh http://localhost:$${AVOIDPP_HOST_PORT:-8099} \
+	  $(if $(filter yes,$(CONFIRM)),--confirm,)
 
 smoke:
 	@test -f .env || { echo 'no .env; run `make dev-key` first' >&2; exit 1; }

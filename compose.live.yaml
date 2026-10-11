@@ -1,0 +1,38 @@
+# Live overlay: the same topology, with the detector calling the real
+# provider instead of the fake one.
+#
+#   make up-live        build and start, detector in live mode
+#   make smoke-live     one real scan through the gateway, end to end
+#
+# Why this is a separate file rather than a variable in compose.yaml: every
+# scan through this stack costs about USD 0.009, and `make up` is the command
+# people run without thinking. An overlay has to be named to take effect.
+#
+# Everything else - the private detector, the dropped capabilities, the
+# memory limits, the absence of a default credential - is inherited
+# unchanged from compose.yaml.
+
+services:
+  detector:
+    environment:
+      AVOIDPP_DETECTOR_MODE: live
+      # From the gitignored repository-root .env, which Compose reads for
+      # substitution. Not committed, and not defaulted: a live detector with
+      # no key must fail at startup rather than start and refuse traffic.
+      LLM_API_KEY: ${LLM_API_KEY:?live mode needs LLM_API_KEY in .env}
+      AVOIDPP_DETECTOR_MODEL: ${AVOIDPP_DETECTOR_MODEL:-claude-opus-5}
+      # Under the gateway's 15 s scan budget, so the detector gives up first
+      # and the gateway reports a detector timeout rather than its own.
+      AVOIDPP_DETECTOR_REQUEST_TIMEOUT_SECONDS: ${AVOIDPP_DETECTOR_REQUEST_TIMEOUT_SECONDS:-12}
+    # The container is read_only, and the provider SDK and its TLS stack want
+    # somewhere to write. 16 MiB is far more than they use, and noexec means
+    # a writable path is not an executable one.
+    tmpfs:
+      - /tmp:size=16m,mode=1777,noexec,nosuid,nodev
+
+  gateway:
+    environment:
+      # A live scan is a provider call. The shipped rate defaults (1/s per
+      # caller) are a spend bound, and they stay the bound here: the point of
+      # this overlay is a working service, not a fast one.
+      AVOIDPP_SCAN_TIMEOUT: ${AVOIDPP_SCAN_TIMEOUT:-15s}
