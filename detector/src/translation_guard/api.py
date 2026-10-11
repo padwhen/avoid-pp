@@ -26,6 +26,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from translation_guard import trace
 from translation_guard.admission import Admission, AtCapacity
 from translation_guard.config import DetectorMode, Settings
 from translation_guard.detectors import (
@@ -215,8 +216,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response_model=AssessmentResponse,
         response_model_exclude_none=True,
     )
-    async def assess(payload: AssessmentRequest) -> Any:
+    async def assess(payload: AssessmentRequest, request: Request) -> Any:
         started = time.monotonic()
+        # C33-AC1: the gateway's trace id, so its log line and this one name
+        # the same request. Absent or malformed means no trace fields rather
+        # than invented ones - see trace.py.
+        trace_fields = trace.fields(request.headers.get(trace.HEADER))
         # Computed once, from the bytes actually received. A size is a count,
         # not content, so it is safe to log and is most of what a routine
         # failure needs.
@@ -232,6 +237,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 outcome,
                 extra={
                     "request_id": payload.request_id,
+                    **trace_fields,
                     "outcome": outcome,
                     "duration_ms": elapsed_ms(),
                     "passage_bytes": passage_bytes,

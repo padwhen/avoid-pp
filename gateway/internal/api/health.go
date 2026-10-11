@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 
 	"github.com/padwhen/avoid-pp/gateway/internal/middleware"
+	"github.com/padwhen/avoid-pp/gateway/internal/telemetry"
 )
 
 // Readiness tracks whether initialisation has finished.
@@ -103,6 +104,32 @@ func NewRouter(readiness *Readiness, deps ScanDeps) http.Handler {
 			Authenticate(deps.Callers, deps.Limiter, deps.Log)(
 				RateLimit(deps.Limiter, deps.Log)(
 					Scan(deps))))
+
+		if deps.Metrics != nil {
+			// Authenticated, unlike the health endpoints, because the block
+			// counter is a detection oracle - see metrics.go. Not rate
+			// limited: a scraper polls on a fixed interval and reading a
+			// counter costs nothing, so the limiter would only ever refuse
+			// a legitimate scrape.
+			mux.Handle("GET /metrics",
+				Authenticate(deps.Callers, deps.Limiter, deps.Log)(
+					Metrics(deps.Metrics)))
+		}
 	}
-	return middleware.WithRequestIDHeader(mux)
+	return middleware.WithRequestIDHeader(withRegistry(deps.Metrics, mux))
+}
+
+// withRegistry puts the metrics registry on every request's context.
+//
+// Wrapped once here rather than passed to each handler, so the error writers
+// can count without taking a dependency they would otherwise need threaded
+// through a dozen call sites.
+func withRegistry(registry *telemetry.Registry, next http.Handler) http.Handler {
+	if registry == nil {
+		return next
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r.WithContext(
+			telemetry.WithRegistry(r.Context(), registry)))
+	})
 }

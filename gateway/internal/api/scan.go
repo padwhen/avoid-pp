@@ -17,6 +17,7 @@ import (
 	"github.com/padwhen/avoid-pp/gateway/internal/limits"
 	"github.com/padwhen/avoid-pp/gateway/internal/middleware"
 	"github.com/padwhen/avoid-pp/gateway/internal/policy"
+	"github.com/padwhen/avoid-pp/gateway/internal/telemetry"
 )
 
 // Assessor is the detector dependency, narrowed to what the handler needs so
@@ -45,6 +46,11 @@ type ScanDeps struct {
 	// Callers, so it holds a fixed amount of state.
 	Limiter *limits.Limiter
 
+	// Metrics records what happened, with label sets fixed at startup. Nil
+	// is legal and records nothing, so a test or an embedding that does not
+	// care about telemetry is not forced to construct one.
+	Metrics *telemetry.Registry
+
 	// Admission bounds how much inference runs at once. A rate limit says
 	// nothing about how many calls are still in flight, which is the number
 	// that actually matters against a dependency measured in seconds.
@@ -72,6 +78,7 @@ func writeRetryableError(
 	code contract.ErrorCode, message string, retryAfter int,
 ) {
 	w.Header().Set("Retry-After", strconv.Itoa(retryAfter))
+	countError(r, code)
 	writeJSON(w, status, contract.ErrorResponse{
 		RequestID: middleware.RequestID(r.Context()),
 		Error: contract.ErrorBody{
@@ -82,7 +89,19 @@ func writeRetryableError(
 	})
 }
 
+// countError records an error code against the registry on the request.
+//
+// Counted at the point the envelope is written rather than at each branch
+// that decides to write one: there are a dozen such branches and a new one
+// would otherwise be invisible in exactly the dashboard built to catch it.
+func countError(r *http.Request, code contract.ErrorCode) {
+	if registry, ok := telemetry.RegistryFrom(r.Context()); ok {
+		registry.Count(telemetry.MetricErrors, map[string]string{"code": string(code)})
+	}
+}
+
 func writeError(w http.ResponseWriter, r *http.Request, status int, code contract.ErrorCode, message string) {
+	countError(r, code)
 	writeJSON(w, status, contract.ErrorResponse{
 		RequestID: middleware.RequestID(r.Context()),
 		Error:     contract.ErrorBody{Code: code, Message: message},
@@ -108,12 +127,30 @@ func Scan(deps ScanDeps) http.Handler {
 		// The handler's logger goes through the allowlisting handler, so a
 		// field added here that is not on the list is dropped and named
 		// rather than emitted.
+		// The trace id joins the log line so one request can be followed
+		// across this service and the detector. The span id identifies this
+		// hop specifically.
+		span, _ := telemetry.SpanFrom(r.Context())
+
+		// Every outcome is logged and counted in one place. Two call sites
+		// would eventually disagree - a branch that logs and forgets to
+		// count is invisible in exactly the dashboards built to catch it.
 		outcome := func(name string, attrs ...any) {
+			elapsed := time.Since(started)
 			log.Info("scan "+name, append([]any{
 				"request_id", requestID,
+				"trace_id", span.TraceID,
+				"span_id", span.SpanID,
 				"outcome", name,
-				"duration_ms", time.Since(started).Milliseconds(),
+				"duration_ms", elapsed.Milliseconds(),
 			}, attrs...)...)
+
+			if deps.Metrics != nil {
+				labels := map[string]string{"outcome": name}
+				deps.Metrics.Count(telemetry.MetricScans, labels)
+				deps.Metrics.Observe(telemetry.MetricScanDuration, labels,
+					telemetry.Seconds(elapsed))
+			}
 		}
 
 		req, err := decodeScanRequest(w, r)
@@ -179,7 +216,25 @@ func Scan(deps ScanDeps) http.Handler {
 		// The context is the one carrying the scan deadline, so a request
 		// that runs out of budget while queued gives up its place instead of
 		// waiting for a slot it could no longer use.
+		admissionStarted := time.Now()
 		release, err := deps.Admission.Acquire(ctx)
+
+		if deps.Metrics != nil {
+			// Recorded on every path, including the refusals below. A wait
+			// histogram that excluded the requests that gave up would be
+			// lowest exactly when the queue is worst, because the abandoned
+			// waits are the long ones - the same reasoning that put the
+			// cancelled case into admission's own counters at C32.
+			deps.Metrics.Observe(telemetry.MetricQueueWait, nil,
+				telemetry.Seconds(time.Since(admissionStarted)))
+
+			stats := deps.Admission.Stats()
+			deps.Metrics.SetGauge(telemetry.MetricAdmissionState,
+				"active", int64(stats.Active))
+			deps.Metrics.SetGauge(telemetry.MetricAdmissionState,
+				"queued", int64(stats.Queued))
+		}
+
 		if err != nil {
 			switch {
 			case errors.Is(err, admission.ErrQueueFull):
@@ -212,6 +267,7 @@ func Scan(deps ScanDeps) http.Handler {
 			return
 		}
 
+		detectorStarted := time.Now()
 		assessment, err := deps.Detector.Assess(ctx, detector.AssessmentRequest{
 			RequestID:  requestID,
 			TaskID:     req.TaskID,
@@ -222,6 +278,16 @@ func Scan(deps ScanDeps) http.Handler {
 		// including failure. Policy evaluation and serialisation are
 		// microseconds and do not need to hold capacity.
 		release()
+
+		if deps.Metrics != nil {
+			// Recorded whether or not the call succeeded. A histogram that
+			// only sees successes reports its best latency as its typical
+			// one, which is backwards - the slow calls are the ones that
+			// time out.
+			deps.Metrics.Observe(telemetry.MetricDetectorCall, nil,
+				telemetry.Seconds(time.Since(detectorStarted)))
+		}
+
 		if err != nil {
 			// Every failure below is an error envelope. None becomes an allow.
 			switch {
@@ -266,6 +332,19 @@ func Scan(deps ScanDeps) http.Handler {
 			writeError(w, r, http.StatusServiceUnavailable,
 				contract.ErrCodeDetectorUnavailable, "Assessment could not be evaluated.")
 			return
+		}
+
+		if deps.Metrics != nil {
+			// The series C33-AC2 turns on. A decision is three bounded
+			// contract values, so this is where "a flag because the label
+			// was uncertain" becomes separable from "a block because it was
+			// suspicious" - which monitoring mode makes a question anyone
+			// running this will ask.
+			deps.Metrics.Count(telemetry.MetricDecisions, map[string]string{
+				"action":      string(decision.Action),
+				"label":       string(assessment.Assessment.Label),
+				"reason_code": string(decision.ReasonCode),
+			})
 		}
 
 		outcome("complete",

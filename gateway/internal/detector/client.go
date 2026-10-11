@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/padwhen/avoid-pp/gateway/internal/contract"
+	"github.com/padwhen/avoid-pp/gateway/internal/telemetry"
 )
 
 // MaxResponseBytes bounds a detector reply. An assessment carries a label,
@@ -172,6 +173,15 @@ func (c *Client) Assess(ctx context.Context, req AssessmentRequest) (*Assessment
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Accept", "application/json")
+
+	// C33-AC1: the detector's logs carry the same trace id as the gateway's,
+	// so one request is followable across both services. A fresh span id,
+	// because this hop is not the same span as the one that called it -
+	// sharing the id would collapse the two into one in anything reading
+	// them, and the whole point is to see where the time went.
+	if span, ok := telemetry.SpanFrom(ctx); ok {
+		httpReq.Header.Set(telemetry.HeaderTraceparent, span.Child().Traceparent())
+	}
 
 	resp, err := c.http.Do(httpReq)
 	if err != nil {

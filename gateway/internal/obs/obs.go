@@ -49,7 +49,17 @@ import (
 // a credential.
 var AllowedKeys = map[string]bool{
 	// Correlation and outcome.
-	"request_id":  true,
+	"request_id": true,
+	// Trace identifiers. Generated here, or parsed from an inbound
+	// traceparent that was validated for length and alphabet before it was
+	// accepted - so neither can carry arbitrary caller bytes into a log.
+	//
+	// These are permitted in logs and deliberately *not* permitted as metric
+	// labels: correlating one request is what a log is for, and one time
+	// series per request is how a metrics system dies. The two lists are
+	// separate for that reason and telemetry/privacy_test.go asserts it.
+	"trace_id":    true,
+	"span_id":     true,
 	"outcome":     true,
 	"status":      true,
 	"code":        true,
