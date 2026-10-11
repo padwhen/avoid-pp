@@ -106,6 +106,11 @@ jobs:
       - name: Gate report provenance
         run: make check-gate-report
 
+      # C35: a runbook naming an environment variable nothing reads sends an
+      # operator to make a change that cannot work.
+      - name: Documented environment variables exist
+        run: make check-docs-env
+
       # A paid tool that runs without confirmation is a bug that costs money.
       # One did, so the guard now has a test.
       - name: Spend guards
