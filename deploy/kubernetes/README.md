@@ -22,6 +22,7 @@ kubectl -n avoid-pp get pods
 kubectl -n avoid-pp get networkpolicy
 
 deploy/kubernetes/smoke.sh drills   # the four drills, repeatable
+deploy/kubernetes/runbooks.sh       # the operating procedures, executed
 
 # Talk to it yourself. Note this breaks on the next rollout - port-forward
 # binds to a pod, not to the Service, which is why the drills do not use it.
@@ -55,7 +56,9 @@ deploy/kubernetes/smoke.sh down
 | `20-detector.yaml` | Deployment + ClusterIP Service, no external exposure |
 | `30-gateway.yaml` | Deployment + Service, `maxUnavailable: 0` |
 | `40-networkpolicy.yaml` | default deny, then two exceptions |
-| `smoke.sh` | the four drills |
+| `smoke.sh` | the four deployment drills (C34) |
+| `runbooks.sh` | the six operating-procedure drills (C35) |
+| `_lib.sh` | shared plumbing: timed steps, hardened helper pods, one scan |
 
 ## The thing worth knowing
 
@@ -73,4 +76,19 @@ PASS a pod that is not the gateway cannot reach the detector (got 000)
 
 With kindnet that line reads `FAIL … reached the detector (HTTP 200)`.
 
-Reasoning and the drills that failed first: [docs/c34-deploy.md](../../docs/c34-deploy.md).
+## The runbooks are executed, not described
+
+`runbooks.sh` runs every command in
+[docs/c35-runbooks.md](../../docs/c35-runbooks.md) and asserts what the
+procedure claims will happen - a provider outage that never becomes an allow,
+a rate-limited caller who is told how long to wait, an oversized passage
+reported as the caller's problem rather than an outage, the deployed version
+triple readable from a live response, a rollback confirmed from a response
+rather than from the spec, and no passage anywhere in the logs or on disk.
+
+18 checks, all passing. Two failed first for harness reasons that produced
+plausible wrong conclusions, which the doc records.
+
+Reasoning and the drills that failed first:
+[docs/c34-deploy.md](../../docs/c34-deploy.md) ·
+[docs/c35-runbooks.md](../../docs/c35-runbooks.md).

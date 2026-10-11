@@ -892,6 +892,37 @@ own harness.
 
 See [C34 acceptance criteria](docs/c34-deploy.md).
 
+## Operating procedures
+
+```sh
+deploy/kubernetes/runbooks.sh   # 18 checks against a running cluster
+```
+
+[C35](docs/c35-runbooks.md) covers provider outage, elevated false positives,
+rate exhaustion, model drift, token-limit failures, rollback and retention —
+and **every command in it is executed by a drill**, because a runbook nobody
+has run is a guess written in the imperative mood.
+
+Things the drills establish rather than assert: an outage never produces an
+allow and recovers with no restart; the gateway stays *ready* during a
+dependency outage, deliberately, because failing readiness would turn a
+legible `detector_unavailable` into an opaque connection error; and a
+rollback is confirmed from a live response rather than from the spec, since a
+spec saying `monitoring` while the service answers `enforcement` is the case
+worth catching.
+
+Retention is enforced rather than promised: neither container can write to
+disk, the only volume is an `emptyDir` that dies with the pod, and no passage
+appears in the logs. There is **no diagnostic capture**, stated as a decision
+— its absence is what makes a false-positive investigation awkward.
+
+**One mistake in the prose that no drill could catch.** The first draft told
+an operator to set `AVOIDPP_DETECTOR_MAX_SOURCE_TOKENS`, which does not
+exist: the token budget is a hardcoded constant with no settings field behind
+it. `make check-docs-env` now asserts every `AVOIDPP_*` named anywhere in the
+documentation is read by the gateway config, the detector settings, Compose
+or the Makefile.
+
 ## Observability
 
 ```sh
