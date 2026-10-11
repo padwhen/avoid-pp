@@ -316,6 +316,67 @@ def check_report_fingerprint(failures: list[str]) -> None:
         failures.append("changing the model did not change the config digest")
 
 
+def check_digest_survives_annotation(failures: list[str]) -> None:
+    """An annotation edit must not make two reports incomparable.
+
+    The digest exists so that "two reports sharing a digest are comparable:
+    the same configuration measured twice, or measured over more data".
+    Until this check it covered the dataset's *file* hash, which moves when
+    a reference translation is filled in or a case is marked reviewed -
+    neither of which the metric reads.
+
+    Found for real: the C26 development run and the later validation run had
+    the same model, prompt, fingerprint and runner version, and different
+    digests, purely because 161 translations had been ingested between them.
+    Exactly the comparison the field exists to make safe, and it would have
+    said "not comparable".
+    """
+    import tempfile
+
+    import yaml as _yaml
+
+    original = load_cases(TOY)
+    baseline = run("scripted")["config_sha256"]
+
+    with tempfile.TemporaryDirectory() as directory:
+        # Annotation only: nothing a detection metric reads.
+        annotated = [dict(case) for case in original]
+        for case in annotated:
+            case["review_status"] = "reviewed"
+            case["expected_english"] = "an annotation the metric never sees"
+        path = Path(directory) / "annotated.yaml"
+        path.write_text(_yaml.safe_dump(annotated, allow_unicode=True))
+
+        cases = load_cases(path)
+        result, per_case = score(cases, ADAPTERS["scripted"])
+        digest = build_report(
+            path, "fake:scripted", result["counts"], per_case, result["deferred"]
+        )["config_sha256"]
+        if digest != baseline:
+            failures.append(
+                "an annotation-only edit changed the config digest, so two "
+                "comparable reports would be reported as incomparable"
+            )
+
+        # And the other direction: a scored field must still move it.
+        relabelled = [dict(case) for case in original]
+        relabelled[0]["text"] = relabelled[0]["text"] + " muutettu"
+        changed_path = Path(directory) / "relabelled.yaml"
+        changed_path.write_text(_yaml.safe_dump(relabelled, allow_unicode=True))
+
+        cases = load_cases(changed_path)
+        result, per_case = score(cases, ADAPTERS["scripted"])
+        digest = build_report(
+            changed_path,
+            "fake:scripted",
+            result["counts"],
+            per_case,
+            result["deferred"],
+        )["config_sha256"]
+        if digest == baseline:
+            failures.append("editing a scored passage did not change the config digest")
+
+
 def main() -> int:
     failures: list[str] = []
 
@@ -394,6 +455,7 @@ def main() -> int:
     check_cost(failures)
     check_slices(failures)
     check_report_fingerprint(failures)
+    check_digest_survives_annotation(failures)
 
     if failures:
         print(f"runner selftest: {len(failures)} failure(s)", file=sys.stderr)
@@ -405,7 +467,8 @@ def main() -> int:
     print("                 abstaining and silence both score as failures;")
     print("                 Clopper-Pearson matches published intervals;")
     print("                 both release gates read UNDETERMINED at seed size;")
-    print("                 unreported token usage is not costed as free")
+    print("                 unreported token usage is not costed as free;")
+    print("                 an annotation edit leaves two reports comparable")
     return 0
 
 

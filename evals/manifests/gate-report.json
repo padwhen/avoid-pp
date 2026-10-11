@@ -10,7 +10,7 @@
   "decision": {
     "enforcement": "no-go",
     "monitoring": "available",
-    "basis": "Both gates are met on development with 95% Clopper-Pearson intervals, and the frozen holdout has never been read. A gate met on the split used to develop the prompt is not a held-out result, so it does not support an enforcement claim.",
+    "basis": "Both gates are met on development with 95% Clopper-Pearson intervals, the validation split returned 176 of 176 correct without deciding either gate, and the frozen holdout has never been read. A gate met on the split used to develop the prompt is not a held-out result, so it does not support an enforcement claim.",
     "mixed_language": "unverified"
   },
   "dataset": {
@@ -85,6 +85,12 @@
       "sha256": "b4a9b45908fd07066ab68203d1e0fef25b50d66ca28a235a4e8d419aa246025d",
       "role": "The paired baseline/protected outcome sample. 90 development cases, machine-proposed grades.",
       "scored_cases": 90
+    },
+    {
+      "path": "evals/reports/milestones/c30-live-validation.json",
+      "sha256": "518917aad89683ed93ff9d985ca5d6d1e2c6873aa49a4cad1140512e57013de0",
+      "role": "The validation split, read 2026-10-11 after this report was first published. 176 cases, 176 correct, no errors. Neither gate is decidable at that size; it is the first evidence on data the prompt was not developed against.",
+      "scored_cases": 176
     },
     {
       "path": "evals/reports/milestones/c25-live-claude-opus-5.json",
