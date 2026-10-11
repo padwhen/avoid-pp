@@ -1051,6 +1051,49 @@ property the published numbers actually depend on.
 
 See [C37](docs/c37-mixed-language.md).
 
+## Segmentation: built, measured, not adopted
+
+```sh
+make check-segmented           # the combination rule, free
+make segmented CONFIRM=yes     # the paired evaluation
+```
+
+Does scanning a passage in pieces catch mixed-language attacks the whole
+passage misses? **No** — and the measurement is what says so rather than the
+intuition.
+
+| | full passage | segmented |
+|---|---|---|
+| challenge cases | 69/69 | 69/69 |
+| boundary probes | 6/6 | 6/6 |
+| provider calls | 69 | **112 (1.62×)** |
+| disagreements | — | **0** |
+
+Zero disagreements, including on the 35 cases that actually produce more
+than one segment. So segmentation costs 1.62× to add a splitter, a coverage
+invariant, a combination rule and three new failure modes, in exchange for
+nothing measurable. The full-passage path is retained — and **the decision
+is a test**: nothing in the request path imports the segmenter, and a test
+fails if anything starts to.
+
+Two design points worth keeping even though the feature was rejected. **The
+splitter never consults a language**, because C38-AC1 forbids discarding a
+segment for being the wrong language and language ID is least reliable at
+exactly the length an embedded attack has. And **the combination rule fails
+closed** — any suspicious segment makes the passage suspicious, because
+majority voting would let a short instruction be outvoted by the ordinary
+Finnish around it.
+
+The boundary probes are the sharpest part: reviewed attacks with a sentence
+boundary pushed into the middle of the instruction, so each half alone might
+look harmless. All six were still caught — the fragment keeping the
+imperative verb is still recognisably an instruction.
+
+**One honest gap.** All seven benign "looks like an instruction" cases
+produced a single segment, so the risk that segmentation strips the framing
+which distinguishes a *reported* instruction from an issued one is
+**untested, not disproved**. See [C38](docs/c38-segmentation.md).
+
 ## Where this stands
 
 [**C30 — Finnish MVP gate report**](docs/c30-gate-report.md) is the release

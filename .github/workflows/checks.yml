@@ -116,6 +116,11 @@ jobs:
       - name: Challenge report arithmetic
         run: make check-challenge
 
+      # C38: the rule that folds per-segment verdicts into one is the whole
+      # safety property of scanning a passage in pieces.
+      - name: Segment combination rule
+        run: make check-segmented
+
       # A paid tool that runs without confirmation is a bug that costs money.
       # One did, so the guard now has a test.
       - name: Spend guards
