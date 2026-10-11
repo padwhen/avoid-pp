@@ -6,6 +6,8 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"net/http"
+
+	"github.com/padwhen/avoid-pp/gateway/internal/telemetry"
 )
 
 // HeaderRequestID is both read and written, so a caller that already has a
@@ -65,6 +67,17 @@ func acceptable(id string) bool {
 
 // WithRequestIDHeader propagates an acceptable inbound request id or issues a
 // new one, exposes it on the context, and echoes it on the response.
+//
+// It also establishes the trace context, because the two answer different
+// questions and a service wants both. A request id is the caller's handle on
+// one call to this gateway; a trace id spans the gateway, the detector and
+// whatever called in. C33 added the second without replacing the first.
+//
+// An inbound traceparent is parsed strictly and a malformed one starts a
+// fresh trace rather than being salvaged - see telemetry.ParseTraceparent.
+// The header is not echoed on the response: traceparent is a request-side
+// propagation header, and returning it would invite a caller to treat this
+// service's span id as its own.
 func WithRequestIDHeader(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := r.Header.Get(HeaderRequestID)
@@ -72,6 +85,13 @@ func WithRequestIDHeader(next http.Handler) http.Handler {
 			id = NewRequestID()
 		}
 		w.Header().Set(HeaderRequestID, id)
-		next.ServeHTTP(w, r.WithContext(WithRequestID(r.Context(), id)))
+
+		span, ok := telemetry.ParseTraceparent(r.Header.Get(telemetry.HeaderTraceparent))
+		if !ok {
+			span = telemetry.NewTrace()
+		}
+
+		ctx := telemetry.WithSpan(WithRequestID(r.Context(), id), span)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

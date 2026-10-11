@@ -22,6 +22,7 @@ import (
 	"github.com/padwhen/avoid-pp/gateway/internal/limits"
 	"github.com/padwhen/avoid-pp/gateway/internal/obs"
 	"github.com/padwhen/avoid-pp/gateway/internal/server"
+	"github.com/padwhen/avoid-pp/gateway/internal/telemetry"
 )
 
 func main() {
@@ -75,6 +76,10 @@ func run() error {
 
 	readiness := api.NewReadiness()
 
+	// Every series is allocated here, at startup, so the metrics footprint
+	// is fixed before the first request and a scrape never allocates.
+	metrics := telemetry.NewRegistry()
+
 	// One client, reused for every scan: a per-request client would discard
 	// its connection pool each time and handshake afresh.
 	client := detector.New(cfg.DetectorURL, cfg.ScanTimeout)
@@ -83,6 +88,7 @@ func run() error {
 		Addr: cfg.Addr,
 		Handler: api.NewRouter(readiness, api.ScanDeps{
 			Detector:  client,
+			Metrics:   metrics,
 			Timeout:   cfg.ScanTimeout,
 			Log:       log,
 			Mode:      cfg.PolicyMode,

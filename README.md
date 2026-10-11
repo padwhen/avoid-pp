@@ -853,6 +853,47 @@ benign answers.
 See [C05](docs/c05-dataset.md) and [C06](docs/c06-runner.md) for acceptance
 criteria and known limitations.
 
+## Observability
+
+```sh
+curl -s -H "Authorization: Bearer $KEY" localhost:8099/metrics
+```
+
+A request carries a W3C `traceparent` across both services, so one trace id
+finds the gateway's log line and the detector's. The outbound hop gets a
+fresh span id — the two are different spans, and sharing an id would collapse
+them.
+
+Four conditions that all reach a caller as "no translation" are separately
+countable, which is the point:
+
+| condition | query |
+|---|---|
+| overload | `avoidpp_scans_total{outcome="shed"}` |
+| provider error | `avoidpp_scans_total{outcome="detector_unavailable"}` |
+| uncertainty | `avoidpp_decisions_total{label="uncertain"}` |
+| policy block | `avoidpp_decisions_total{action="block"}` |
+
+**There is no OpenTelemetry SDK.** The wire format is OpenTelemetry's and the
+instrumentation is manual, because auto-instrumentation records request
+attributes by default — which for this service means an attacker's Finnish
+passage. C23 built an allowlist so a field has to be named before it can be
+emitted; telemetry that captures by default would undo that.
+
+**`/metrics` requires the bearer token**, which is unconventional and
+deliberate: `avoidpp_decisions_total{action="block"}` is an oracle. An
+attacker watching it learns per attempt whether a passage was caught.
+
+Every label value is enumerated at compile time, so total cardinality is 350
+series and no input can raise it. `request_id` is loggable and cannot be a
+label — correlating one request is what a log is for, and one time series per
+request is how a metrics system dies.
+
+Writing the Python parser found a real bug: `^…$` validated a trace id with a
+trailing newline, because Python's `$` matches before one. A newline in a
+trace id splits one log line into two, the second attacker-chosen. It uses
+`\A…\Z` now. See [C33 acceptance criteria](docs/c33-observability.md).
+
 ## Capacity and cost
 
 ```sh

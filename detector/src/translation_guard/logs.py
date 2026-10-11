@@ -66,6 +66,12 @@ ALLOWED_FIELDS = frozenset(
     {
         # Correlation and outcome.
         "request_id",
+        # Trace identifiers from the gateway's traceparent header, so one
+        # request can be followed across both services. Parsed strictly in
+        # trace.py before they get here: 32 and 16 lowercase hex digits, so
+        # neither can carry arbitrary bytes into a log line.
+        "trace_id",
+        "span_id",
         "outcome",
         "status",
         "error_code",
