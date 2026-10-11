@@ -27,6 +27,11 @@ Both gates are **met on development**, with intervals that clear the
 thresholds rather than merely touching them. And the holdout has never been
 read.
 
+The validation split has since been read — 176 of 176 correct, no errors —
+and it does not change this. Neither gate is decidable at that size, and
+validation is not the held-out set. It is the best available evidence that
+the development result generalises, and it is not a release claim.
+
 That is the whole decision. A gate met on the split the prompt was developed
 against is not a held-out result — it is the training signal, scored. It is
 genuine evidence that the approach works and it is not evidence that it
@@ -146,6 +151,72 @@ call and any retry. A deployment with a tighter timeout would convert the slow
 tail into `deadline_exceeded` errors — which fail closed, and so appear as
 blocks rather than as leaks, but a block is still a user who did not get a
 translation.
+
+---
+
+## The validation split, read after this report was first published
+
+**176 cases, 20 attacks, 156 benign. 176 of 176 correct. Zero errors.**
+USD 1.65, 116 seconds, 2026-10-11.
+
+| | observed | 95% interval | gate |
+|---|---|---|---|
+| recall | 1.000 | [0.832, 1.000] | **undetermined** |
+| false-positive rate | 0.000 | [0.000, 0.023] | **undetermined** |
+
+Neither gate moves — 20 attacks cannot decide a 90% recall gate and 156
+benign cases cannot decide a 1% false-positive gate, as the frozen manifest
+predicted before the run. So this changes no verdict in this report.
+
+What it does change is the strength of the evidence behind the decision, in
+both directions.
+
+**It is the first result on data the prompt was not developed against.** Not
+the holdout — validation is the split that exists to be read repeatedly,
+precisely so generalisation can be checked without spending the one-time
+read. A perfect sweep on 176 unseen cases is the outcome most consistent with
+the development result generalising.
+
+**It is still not a held-out claim**, and the gates are still undetermined
+here, so the enforcement decision is unchanged.
+
+Two details worth recording:
+
+- **Zero errors**, where development had two. Both of those were the
+  character-separated obfuscation cases, and both live in the development
+  split — so the one reproducible availability failure this project has found
+  is not represented in validation at all.
+- **Per-slice: 133/133 ordinary, 18/18 task_redirection, 16/16 imperative,
+  7/7 quoted_attack, 2/2 detector_targeting.** The `quoted_attack` slice
+  matters most and is now 34 for 34 across both splits.
+
+Latency was consistent with development: p50 2 813 ms against 2 833 ms, p95
+6 197 ms against 5 851 ms, p99 7 721 ms against 10 191 ms.
+
+### A provenance bug this comparison exposed
+
+Comparing the two runs should have been trivial: same model, same prompt,
+same fingerprint `5f42eb70…`, same runner version. Their `config_sha256`
+values differed anyway.
+
+`runner.py` says the digest exists so that *"two reports sharing a digest are
+comparable: the same configuration measured twice, or measured over more
+data"* — which is exactly this comparison. It covered the dataset's **file**
+hash, and 161 reference translations had been ingested between the two runs.
+Annotation edits, nothing the metric reads, and the field designed to certify
+comparability would have said these two runs were incomparable.
+
+Fixed the way C30 already fixed it for the published report: the digest now
+covers the **scored content** — `id`, `text`, `expected_label`, `category`,
+`deferred_quality` — and reports carry both, the file hash identifying the
+bytes and the content hash identifying the claim. `selftest.py` asserts both
+directions: an annotation-only edit leaves the digest alone, and editing a
+scored passage moves it.
+
+The validation report above was written before that change, so it carries the
+old-style digest. The scored content it ran against is `5df66ecb…`, the same
+value every revision of this corpus has had, verifiable with
+`make provenance`.
 
 ---
 

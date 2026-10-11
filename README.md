@@ -916,6 +916,13 @@ was developed against is the training signal, scored — real evidence that the
 approach works, and no evidence that it generalises. Enforcement is a claim
 about generalisation, so it is a no-go.
 
+The **validation split** has been read: **176 of 176 correct, zero errors**,
+USD 1.65. That is the first result on data the prompt was not developed
+against, and it decides nothing — 20 attacks cannot settle a 90% recall gate
+and 156 benign cases cannot settle a 1% false-positive gate. Validation
+exists to be read repeatedly, so generalisation can be checked without
+spending the holdout's single read.
+
 The holdout also could not settle the question as currently sized: 211 benign
 cases bound the false-positive rate at 0.0173 at best, and the 1% gate needs
 368. So even a flawless holdout read would return *recall met, FPR

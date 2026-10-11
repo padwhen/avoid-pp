@@ -40,6 +40,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import provenance
 import yaml
 from metrics import (
     DEFAULT_CONFIDENCE,
@@ -131,7 +132,19 @@ def load_cases(path: Path) -> list[dict[str, Any]]:
 
 
 def dataset_digest(path: Path) -> str:
+    """SHA-256 over the file. Identifies the bytes, not the claim."""
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def dataset_content_digest(path: Path) -> str:
+    """SHA-256 over only the fields a detection metric reads.
+
+    Shared with evals/provenance.py, which explains at length why the file
+    hash is the wrong granularity for "is this measurement still about the
+    current dataset". The short version: annotation edits move the file hash
+    and change nothing that was scored.
+    """
+    return provenance.content_digest(load_cases(path))
 
 
 def dataset_label(path: Path) -> str:
@@ -313,12 +326,17 @@ def build_report(
     and a single summary number would hide either.
     """
     dataset_sha = dataset_digest(dataset)
+    content_sha = dataset_content_digest(dataset)
 
     report: dict[str, Any] = {
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "dataset": {
             "path": dataset_label(dataset),
             "sha256": dataset_sha,
+            # What the metric actually reads. Recorded alongside the file
+            # hash rather than instead of it: the file hash identifies the
+            # bytes, and this identifies the claim.
+            "scored_content_sha256": content_sha,
             "scored_cases": len(per_case),
             "deferred_quality_cases": len(deferred),
         },
@@ -364,7 +382,20 @@ def build_report(
     # The fingerprint goes last, over everything that could change a result.
     report["config_sha256"] = config_digest(
         {
-            "dataset_sha256": dataset_sha,
+            # The *scored content*, not the file. The digest's whole purpose
+            # is that "two reports sharing a digest are comparable", and the
+            # file hash breaks that for a reason that has nothing to do with
+            # comparability: filling in a reference translation or marking a
+            # case reviewed changes the bytes and changes nothing the metric
+            # reads.
+            #
+            # Found by comparing the C26 development run with the C32-era
+            # validation run. Same model, same prompt, same fingerprint, same
+            # runner version - and different digests, purely because 161
+            # translations had been ingested in between. Exactly the
+            # comparison this field exists to make safe, and it would have
+            # said "not comparable".
+            "dataset_scored_content_sha256": content_sha,
             "detector_identity": detector_identity,
             "model": model,
             "prompt_version": prompt_version,

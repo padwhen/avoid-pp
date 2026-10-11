@@ -92,6 +92,24 @@ func startLiveGateway(
 	return nil
 }
 
+// drainClient is deliberately not http.DefaultClient.
+//
+// Go's Server.Shutdown does not treat a connection in StateNew as idle until
+// it is more than five seconds old (net/http issue 22682), so a connection
+// the client dialled and never used blocks quiescence for the entire drain
+// budget. With four concurrent requests the shared default transport opens
+// such connections often enough to make the drain assertion bimodal: locally
+// this test drained in 1-4ms four runs out of five and in exactly the 3s
+// budget on the fifth, and it failed that way in CI.
+//
+// The lingering connection is an artefact of the test client, not a property
+// of the gateway - the requests themselves all completed. One connection per
+// request, closed when the response is read, so the only connections the
+// server sees are ones carrying work.
+var drainClient = &http.Client{
+	Transport: &http.Transport{DisableKeepAlives: true},
+}
+
 // scanOver sends a real HTTP request to the running gateway.
 func scanOver(addr, text string) (int, string, error) {
 	raw, err := json.Marshal(map[string]any{
@@ -113,7 +131,7 @@ func scanOver(addr, text string) (int, string, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+faultKey)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := drainClient.Do(req)
 	if err != nil {
 		return 0, "", err
 	}
