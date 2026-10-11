@@ -1,0 +1,63 @@
+# The gateway, as a Fly app with no public address.
+#
+#   fly apps create avoid-pp-gateway
+#   fly secrets set -a avoid-pp-gateway AVOIDPP_API_KEYS="<caller>:translate_fi_en_v1:<key>"
+#   fly deploy -a avoid-pp-gateway -c deploy/fly/gateway.fly.toml --dockerfile gateway/Dockerfile
+#
+# Reachable from other apps in the same organisation at
+# http://avoid-pp-gateway.internal:8080 over Fly's private network, and from
+# nowhere else. There is no [http_service] block, which is the whole point:
+# publishing this to the internet would put an authenticated, money-spending
+# endpoint on a public address to save configuring one hostname.
+#
+# Plaintext over that network is deliberate and has to be named by the
+# caller - `allowPlaintextHosts: ['avoid-pp-gateway.internal']` in the Node
+# client. 6PN is WireGuard between machines, so the bearer token never
+# touches the public internet; the alternative people pick when a client
+# refuses is to publish the gateway, which is worse.
+
+app = 'avoid-pp-gateway'
+primary_region = 'arn'
+
+[build]
+  dockerfile = '../../gateway/Dockerfile'
+
+[env]
+  AVOIDPP_ADDR = ':8080'
+  AVOIDPP_DETECTOR_URL = 'http://avoid-pp-detector.internal:9000'
+  AVOIDPP_POLICY_MODE = 'monitoring'
+
+  # Sized from the C32 profile rather than guessed. Go does not read the
+  # cgroup limit on its own, so without GOMEMLIMIT the runtime grows until
+  # the kernel kills the process.
+  GOMEMLIMIT = '200MiB'
+
+  # rate/burst, and these bound spend before they bound load: a scan is a
+  # provider call at about USD 0.009. 5/20 is sized for one backend whose own
+  # limiter allows 30 requests a minute per IP; the shipped default of 1/5
+  # would 429 under ordinary traffic.
+  AVOIDPP_RATE_CALLER = '5/20'
+  AVOIDPP_RATE_GLOBAL = '8/30'
+  AVOIDPP_RATE_UNAUTHENTICATED = '2/10'
+
+  # Concurrency, which is a different question from arrival rate: at four
+  # seconds a call, five per second leaves about twenty in flight.
+  AVOIDPP_MAX_ACTIVE = '8'
+  AVOIDPP_MAX_QUEUED = '16'
+
+  # C34: fail readiness this long before draining, so Fly's proxy routes
+  # traffic away before connections are cut. Found by a drill that dropped
+  # one request in forty without it.
+  AVOIDPP_PREDRAIN = '3s'
+  AVOIDPP_SHUTDOWN_TIMEOUT = '15s'
+
+[[vm]]
+  memory = '256mb'
+  cpu_kind = 'shared'
+  cpus = 1
+
+# No auto_stop. A guard that scales to zero adds a cold start to the first
+# scan after an idle period, which is the request a user is waiting on.
+[machine]
+  auto_stop_machines = false
+  min_machines_running = 1

@@ -902,6 +902,25 @@ own harness.
 
 See [C34 acceptance criteria](docs/c34-deploy.md).
 
+### Fly
+
+[`deploy/fly/`](deploy/fly/) puts the two services next to a backend that
+already runs on Fly: two apps, no public address, reachable only inside one
+organisation over 6PN.
+
+```sh
+fly deploy -a avoid-pp-detector -c deploy/fly/detector.fly.toml
+fly deploy -a avoid-pp-gateway  -c deploy/fly/gateway.fly.toml
+```
+
+It is weaker than the Kubernetes deployment in one specific way, and the
+directory says so rather than implying parity: **Fly's private network is
+flat within an organisation**, so any app in the org can reach the detector,
+and anything that reaches the detector bypasses the gateway's validation,
+authentication, limits and policy. The Kubernetes manifests restrict it to
+the gateway and a drill proves the restriction is enforced. There is no
+equivalent on Fly.
+
 ## Operating procedures
 
 ```sh

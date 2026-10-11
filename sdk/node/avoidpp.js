@@ -64,6 +64,13 @@ const RETRYABLE_STATUS = Object.freeze([429]);
 // Hosts for which an unencrypted base URL is accepted. Anywhere else http://
 // would put a bearer token on the wire in clear text, and the service it
 // authenticates spends money.
+//
+// A caller on a private encrypted network - Fly's 6PN, a service mesh, a VPC
+// with no egress - can add hosts with `allowPlaintextHosts`. That option
+// exists because the alternative people actually choose is worse: given a
+// client that refuses, they terminate TLS by publishing the gateway to the
+// internet. It is deliberately a list of named hosts rather than a boolean,
+// so the thing being trusted is written down and greppable.
 const LOCAL_HOSTS = Object.freeze(['localhost', '127.0.0.1', '::1', '[::1]']);
 
 /** SHA-256 over the exact UTF-8 bytes, with no normalisation of any kind. */
@@ -418,6 +425,8 @@ class ScanClient {
    * @param {number} options.timeoutMs     per-attempt deadline
    * @param {string} [options.languageHint] routing metadata only
    * @param {object} [options.retry]       {maxAttempts, maxDelayMs, fallbackDelayMs}
+   * @param {string[]} [options.allowPlaintextHosts] hosts reachable over http
+   *   because the network itself is private and encrypted
    * @param {Function} [options.fetch]     injected for tests
    */
   constructor({
@@ -427,6 +436,7 @@ class ScanClient {
     taskId = 'translate_fi_en_v1',
     languageHint = null,
     retry = NO_RETRY,
+    allowPlaintextHosts = [],
     fetch: fetchImpl = globalThis.fetch,
   } = {}) {
     if (typeof apiKey !== 'string' || apiKey === '') {
@@ -448,10 +458,16 @@ class ScanClient {
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
       throw new NotConfigured('baseUrl must be an http or https URL');
     }
-    if (parsed.protocol === 'http:' && !LOCAL_HOSTS.includes(parsed.hostname)) {
+    if (!Array.isArray(allowPlaintextHosts)) {
+      throw new NotConfigured('allowPlaintextHosts must be an array of host names');
+    }
+    const plaintextOk = LOCAL_HOSTS.includes(parsed.hostname) || allowPlaintextHosts.includes(parsed.hostname);
+    if (parsed.protocol === 'http:' && !plaintextOk) {
       throw new NotConfigured(
         'baseUrl must use https for a non-local host, because the API key ' +
-          'would otherwise be sent in clear text',
+          'would otherwise be sent in clear text. Name the host in ' +
+          'allowPlaintextHosts if the network between you and it is private ' +
+          'and encrypted.',
       );
     }
     if (parsed.username || parsed.password) {

@@ -15,6 +15,12 @@ So the documentation is checked against the code. Two sources of truth:
   * the gateway's Env* constants in gateway/internal/config
   * the detector's Settings fields, which pydantic prefixes AVOIDPP_DETECTOR_
 
+A third category arrived with the Fly deployment: AVOIDPP_URL and AVOIDPP_KEY
+are read by the application calling the gateway, not by anything here. Those
+are listed separately from the absent ones, because "nothing reads this" and
+"the caller reads this" are different claims and merging them would turn the
+absent list into a place to put anything that fails the check.
+
 A name may be absent from all of them only if it is listed below as
 deliberately documented-as-missing.
 
@@ -42,6 +48,20 @@ DOCUMENTED_AS_ABSENT = {
     # C35 runbook 5 and its closing section: the token budget is hardcoded,
     # and saying so is the point of the passage that names it.
     "AVOIDPP_DETECTOR_MAX_SOURCE_TOKENS": "C35 names it to say it does not exist",
+}
+
+# Names that belong to a *caller* of this service rather than to the service.
+#
+# A third category, separate from DOCUMENTED_AS_ABSENT because it is a
+# different claim. "Nothing reads this" and "the application on the other end
+# of the client reads this" are not the same statement, and collapsing them
+# would make the absent list a place to put anything the checker complains
+# about. The deployment documentation has to name these, because telling an
+# operator to deploy the gateway without telling them what the caller needs
+# is half an instruction.
+READ_BY_A_CALLER = {
+    "AVOIDPP_URL": "the gateway address, read by the integrating application",
+    "AVOIDPP_KEY": "the caller's own credential, read by the integrating application",
 }
 
 
@@ -100,7 +120,7 @@ def main() -> int:
     problems: list[str] = []
 
     for name, paths in sorted(documented().items()):
-        if name in known or name in DOCUMENTED_AS_ABSENT:
+        if name in known or name in DOCUMENTED_AS_ABSENT or name in READ_BY_A_CALLER:
             continue
         where = ", ".join(sorted(str(p) for p in paths))
         problems.append(f"{name}: named in {where}, read by nothing")
@@ -111,6 +131,12 @@ def main() -> int:
         if name in known:
             problems.append(
                 f"{name}: listed as absent ({reason}) but the code now reads it"
+            )
+    for name, reason in sorted(READ_BY_A_CALLER.items()):
+        if name in known:
+            problems.append(
+                f"{name}: listed as a caller's variable ({reason}) but this "
+                "repository now reads it too"
             )
 
     if problems:
@@ -128,7 +154,8 @@ def main() -> int:
         f"                                  the detector settings, Compose or "
         f"the Makefile\n"
         f"                                  "
-        f"({len(DOCUMENTED_AS_ABSENT)} deliberately documented as absent)"
+        f"({len(DOCUMENTED_AS_ABSENT)} deliberately documented as absent, "
+        f"{len(READ_BY_A_CALLER)} a caller's)"
     )
     return 0
 

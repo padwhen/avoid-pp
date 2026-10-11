@@ -250,6 +250,29 @@ test('misconfiguration is a ScanFailed, so a catch-and-refuse cannot be bypassed
   );
 });
 
+test('plaintext to a named private host is allowed, and only to that host', () => {
+  const build = (baseUrl, allowPlaintextHosts) =>
+    new ScanClient({
+      baseUrl,
+      apiKey: 'k',
+      timeoutMs: 1000,
+      allowPlaintextHosts,
+      fetch: async () => new Response('{}'),
+    });
+
+  // The case this exists for: a private, encrypted network where the
+  // alternative to allowing this is publishing the gateway to the internet.
+  assert.doesNotThrow(() => build('http://guard.internal:8080', ['guard.internal']));
+
+  // Naming one host does not widen the rule to any other.
+  assert.throws(() => build('http://other.internal:8080', ['guard.internal']), ScanFailed);
+  // And it is a list of hosts, not a boolean that can be set to true once.
+  assert.throws(() => build('http://guard.internal:8080', true), ScanFailed);
+  assert.throws(() => build('http://guard.internal:8080', []), ScanFailed);
+  // https is unaffected either way.
+  assert.doesNotThrow(() => build('https://guard.example.com', []));
+});
+
 test('a transport failure reports a type, never a message', async () => {
   const client = new ScanClient({
     baseUrl: 'https://gateway.test',

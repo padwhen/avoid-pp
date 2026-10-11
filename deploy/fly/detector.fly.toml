@@ -1,0 +1,52 @@
+# The detector, as a Fly app with no public address and the provider key.
+#
+#   fly apps create avoid-pp-detector
+#   fly secrets set -a avoid-pp-detector LLM_API_KEY="<key>"
+#   fly deploy -a avoid-pp-detector -c deploy/fly/detector.fly.toml --dockerfile detector/Dockerfile
+#
+# Private for a stronger reason than the gateway: anything that can reach
+# this can request an assessment directly, bypassing the gateway's
+# validation, authentication, rate limits and policy. It holds the provider
+# credential and every call it serves costs money.
+#
+# Fly's private network is flat within an organisation, so this is reachable
+# by any app in the org rather than by the gateway alone - unlike the
+# Kubernetes deployment, where a NetworkPolicy restricts it to the gateway
+# and a drill proves it. That is a real difference in posture and the reason
+# the Kubernetes manifests exist alongside this.
+
+app = 'avoid-pp-detector'
+primary_region = 'arn'
+
+[build]
+  dockerfile = '../../detector/Dockerfile'
+
+# The image's CMD passes --host and --port to uvicorn directly, so
+# AVOIDPP_DETECTOR_HOST and AVOIDPP_DETECTOR_PORT are not set here: they are
+# real settings that this image does not consult, and setting them would read
+# as configuration while changing nothing.
+[env]
+  # Live, which is the only reason to deploy this at all. Fake mode is for
+  # development and CI, and a deployed fake detector is a service that
+  # returns well-formed verdicts about nothing.
+  AVOIDPP_DETECTOR_MODE = 'live'
+  AVOIDPP_DETECTOR_MODEL = 'claude-opus-5'
+
+  # Under the gateway's scan budget, so the detector gives up first and the
+  # gateway reports a detector timeout rather than its own.
+  AVOIDPP_DETECTOR_REQUEST_TIMEOUT_SECONDS = '12'
+
+  # Above the gateway's MaxActive on purpose: in normal operation the gateway
+  # sheds first and this never fires, so a rejection here means something is
+  # calling the detector directly.
+  AVOIDPP_DETECTOR_MAX_ACTIVE = '16'
+  AVOIDPP_DETECTOR_MAX_WAITING = '32'
+
+[[vm]]
+  memory = '512mb'
+  cpu_kind = 'shared'
+  cpus = 1
+
+[machine]
+  auto_stop_machines = false
+  min_machines_running = 1

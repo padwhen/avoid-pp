@@ -50,6 +50,26 @@ JavaScript terms, because the language makes both easy to get wrong:
   permission in an `if`. An action the build does not recognise returns
   `false`.
 
+## Plaintext on a private network
+
+`http://` to anything but localhost is refused, because the API key is a
+spending account. On a network that is private and encrypted — Fly's 6PN, a
+service mesh, a VPC with no egress — name the host:
+
+```js
+new ScanClient({
+  baseUrl: 'http://avoid-pp-gateway.internal:8080',
+  apiKey: process.env.AVOIDPP_KEY,
+  timeoutMs: 20000,
+  allowPlaintextHosts: ['avoid-pp-gateway.internal'],
+});
+```
+
+A list of hosts rather than a boolean, so the thing being trusted is written
+down and greppable. The option exists because the alternative people actually
+choose when a client refuses is worse: they publish the gateway to the
+internet to get a TLS certificate in front of it.
+
 ## What is deliberately absent
 
 No `isSafe`, no default `translateOnFlag: true`, no automatic retry, no
