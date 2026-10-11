@@ -853,6 +853,45 @@ benign answers.
 See [C05](docs/c05-dataset.md) and [C06](docs/c06-runner.md) for acceptance
 criteria and known limitations.
 
+## Deploying
+
+```sh
+deploy/kubernetes/smoke.sh all   # cluster, deploy, four drills, teardown
+```
+
+[`deploy/kubernetes/`](deploy/kubernetes/) holds manifests for a local
+Kubernetes cluster and a script that **proves** four operational behaviours
+instead of describing them: the detector accepts only the gateway, a rollout
+drops no request, a rotated Secret takes effect only after a roll, and
+`rollout undo` restores a working revision. 8 checks, all passing, on `kind`
+with Calico — nothing is spent, since the detector runs in fake mode.
+
+The finding worth repeating: **kind's default CNI accepts NetworkPolicy and
+enforces none of it.** All three policies were present, `kubectl get` listed
+them, and any pod could reach the detector — bypassing the gateway's
+validation, limits, admission control and policy. Manifests that pass
+inspection are not a control; the drill is what tells enforcement from
+decoration.
+
+**The drain drill found a real defect.** On a cold cluster, a rolling restart
+dropped 1 request in 40 — because the gateway failed readiness and closed its
+listener in the same instant, while Kubernetes still needed seconds to
+withdraw the endpoint. It had been draining correctly all along; it stopped
+*accepting* too early. C24 could not have caught this: in-process there is no
+endpoint to withdraw. The fix is `AVOIDPP_PREDRAIN`, a window where the
+service keeps serving while advertising itself as not ready — in the process
+rather than a `preStop` sleep, because the `scratch` image has no shell and
+the process is the thing that knows it is draining.
+
+Two more failures were the harness's own and are worth recording. The first
+drain drill reported 124 of 150 requests failed and was measuring the **rate
+limiter** — 10 req/s against a shipped 1 req/s spend bound. The next failed
+because **`kubectl port-forward svc/…` does not survive pod replacement**; it
+binds to a pod, not the Service, so three of four drills were breaking their
+own harness.
+
+See [C34 acceptance criteria](docs/c34-deploy.md).
+
 ## Observability
 
 ```sh

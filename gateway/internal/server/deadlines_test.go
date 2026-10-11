@@ -1,9 +1,13 @@
 package server
 
 import (
+	"context"
 	"net/http"
+	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/padwhen/avoid-pp/gateway/internal/config"
 )
 
 // The connection deadlines C32 added.
@@ -92,5 +96,73 @@ func TestTheReadDeadlineIsGenerousAgainstTheBodyCap(t *testing.T) {
 		t.Errorf("ReadTimeout %s demands %.0f bytes/second to upload the body "+
 			"cap; that is tight enough to refuse a slow but honest client",
 			http.ReadTimeout, bytesPerSecond)
+	}
+}
+
+// TestThePreDrainWindowKeepsServing is the C34 fix, in miniature.
+//
+// A rolling restart dropped one request in forty because readiness failing
+// and the listener closing happened in the same instant. The window between
+// them is what an orchestrator needs to withdraw an endpoint, and during it
+// the server must still answer normally - a window that refused requests
+// would be the same bug with a longer name.
+func TestThePreDrainWindowKeepsServing(t *testing.T) {
+	var drained atomic.Bool
+	srv, err := New(Options{
+		Addr: "127.0.0.1:0",
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}),
+		Drain:    2 * time.Second,
+		PreDrain: 400 * time.Millisecond,
+		OnDrain:  func() { drained.Store(true) },
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- srv.Run(ctx) }()
+
+	endpoint := "http://" + srv.Addr() + "/"
+	if _, err := http.Get(endpoint); err != nil {
+		t.Fatalf("before shutdown: %v", err)
+	}
+
+	cancel()
+
+	// Readiness must fail immediately, and the socket must still answer.
+	for _, delay := range []time.Duration{20 * time.Millisecond, 250 * time.Millisecond} {
+		time.Sleep(delay)
+		if !drained.Load() {
+			t.Error("readiness was not failed at the start of the window")
+		}
+		resp, err := http.Get(endpoint)
+		if err != nil {
+			t.Fatalf("refused a request %s into the pre-drain window: %v", delay, err)
+		}
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("status %d during the pre-drain window", resp.StatusCode)
+		}
+	}
+
+	if err := <-done; err != nil {
+		t.Errorf("Run: %v", err)
+	}
+	// And afterwards it is closed.
+	if _, err := http.Get(endpoint); err == nil {
+		t.Error("the listener is still accepting after the drain completed")
+	}
+}
+
+// TestZeroPreDrainIsTheSingleProcessDefault keeps the default honest.
+func TestZeroPreDrainIsTheSingleProcessDefault(t *testing.T) {
+	// Nothing to tell when there is no load balancer, and a delay would make
+	// every local Ctrl-C slower for no benefit. The Kubernetes manifest sets
+	// it; the library does not.
+	if config.DefaultPreDrain != 0 {
+		t.Errorf("DefaultPreDrain = %s, want 0", config.DefaultPreDrain)
 	}
 }

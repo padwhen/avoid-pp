@@ -1,0 +1,13 @@
+# One namespace, so the NetworkPolicy below has a boundary to be about.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: avoid-pp
+  labels:
+    name: avoid-pp
+    # Enforced, not audited. The pod specs already satisfy "restricted"
+    # - non-root, no capabilities, no privilege escalation, seccomp - so
+    # turning the admission controller on costs nothing today and refuses a
+    # future pod that quietly drops one of them.
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest

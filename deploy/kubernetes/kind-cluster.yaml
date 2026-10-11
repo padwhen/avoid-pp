@@ -1,0 +1,19 @@
+# A local cluster for the C34 drills.
+#
+# `disableDefaultCNI` is the point of this file. kind's default CNI, kindnet,
+# accepts NetworkPolicy objects and enforces none of them - so the policies in
+# 40-networkpolicy.yaml would be present, visible to `kubectl get`, and inert.
+# That is worse than having no policy at all, because the cluster looks
+# isolated and is not.
+#
+# Calico is installed in its place by smoke.sh, which then proves the
+# difference by probing the detector from a pod that should be denied.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: avoid-pp
+networking:
+  disableDefaultCNI: true
+  # Calico's default IPv4 pool, so its manifest needs no edit.
+  podSubnet: "192.168.0.0/16"
+nodes:
+  - role: control-plane

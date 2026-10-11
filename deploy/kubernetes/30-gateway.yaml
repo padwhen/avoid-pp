@@ -1,0 +1,119 @@
+# The gateway. The only component with an ingress path.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: avoid-pp
+  labels: { app: gateway }
+spec:
+  replicas: 1
+  # One replica, deliberately. C21's rate limits and C22's admission control
+  # are per-process, so two replicas would double both without saying so -
+  # that is C40's problem and C40's trigger has not fired.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      # Zero, so a rollout never runs below capacity. With one replica this
+      # is what makes the drain drill meaningful: the new pod must be ready
+      # before the old one is told to stop.
+      maxUnavailable: 0
+  selector:
+    matchLabels: { app: gateway }
+  template:
+    metadata:
+      labels: { app: gateway }
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile: { type: RuntimeDefault }
+      # Must exceed AVOIDPP_SHUTDOWN_TIMEOUT, or the kubelet kills the
+      # process mid-drain and the in-flight scans C24 guarantees will finish
+      # are cut off instead. 10s budget, 30s grace: room for the readiness
+      # probe to fail and endpoints to be withdrawn first.
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: gateway
+          image: avoid-pp/gateway:local
+          imagePullPolicy: Never
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: AVOIDPP_ADDR
+              value: ":8080"
+            - name: AVOIDPP_DETECTOR_URL
+              value: http://detector.avoid-pp.svc.cluster.local:9000
+            - name: AVOIDPP_POLICY_MODE
+              # Monitoring, which is the only mode C30 describes as ready.
+              value: monitoring
+            - name: AVOIDPP_SHUTDOWN_TIMEOUT
+              value: 10s
+            # Keep accepting for 5s after readiness fails, before closing
+            # the listener. Without it a rolling restart drops requests:
+            # readiness failing and the socket closing happen in the same
+            # instant, and Kubernetes needs time to notice, withdraw the
+            # endpoint and update every node's kube-proxy rules. C34
+            # measured 1 request in 40 refused on a cold cluster.
+            #
+            # 5s covers the readiness period below (2s, threshold 1) with
+            # margin. PreDrain + SHUTDOWN_TIMEOUT = 15s must stay inside
+            # terminationGracePeriodSeconds above, or the kubelet kills the
+            # process mid-drain.
+            - name: AVOIDPP_PREDRAIN
+              value: 5s
+            # Go's heap target. Without it the runtime does not know about
+            # the cgroup limit and will happily grow until the kernel kills
+            # the process - an OOMKill rather than a GC. Set below the limit
+            # so there is room for non-heap memory.
+            - name: GOMEMLIMIT
+              value: "100MiB"
+          envFrom:
+            - secretRef:
+                name: avoidpp-gateway
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            # From the C32 profile: peak heap 4.4 MiB at the largest passage
+            # the service accepts, and in-flight work bounded by admission to
+            # MaxActive + MaxQueued = 8 passages. 128Mi is an order of
+            # magnitude of headroom over a measured number rather than a
+            # guess, and GOMEMLIMIT above keeps the runtime inside it.
+            requests: { cpu: 50m, memory: 32Mi }
+            limits: { cpu: 500m, memory: 128Mi }
+          readinessProbe:
+            # Two seconds, and this period is load-bearing. The gateway fails
+            # readiness the instant a drain begins (C24), and endpoints are
+            # withdrawn only after the probe notices - so the probe period is
+            # how long a terminating pod keeps receiving new requests. The
+            # usual remedy is a preStop sleep; the image is `scratch` and has
+            # no shell to sleep with, which forced the better answer.
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 2
+            failureThreshold: 1
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 10
+            failureThreshold: 3
+          startupProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 1
+            failureThreshold: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: avoid-pp
+spec:
+  type: ClusterIP
+  selector: { app: gateway }
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

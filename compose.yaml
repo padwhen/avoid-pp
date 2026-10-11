@@ -45,6 +45,12 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    # C34-AC1. Python, FastAPI and uvicorn have a floor around 100 MiB before
+    # a request arrives, which is most of this; the per-request cost is one
+    # passage per in-flight call, bounded by MAX_ACTIVE above.
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 128
     restart: unless-stopped
 
   gateway:
@@ -53,6 +59,10 @@ services:
     environment:
       AVOIDPP_ADDR: ":8080"
       AVOIDPP_DETECTOR_URL: http://detector:9000
+      # Go does not read the cgroup limit on its own, so without this the
+      # runtime grows until the kernel kills the process - an OOMKill rather
+      # than a collection. Set below mem_limit to leave room for non-heap.
+      GOMEMLIMIT: "100MiB"
       AVOIDPP_POLICY_MODE: ${AVOIDPP_POLICY_MODE:-monitoring}
       # No default. A development key committed to the repository would be a
       # public credential, so Compose fails here instead of substituting one.
@@ -82,6 +92,14 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    # C34-AC1, sized from the C32 profile rather than guessed: peak heap was
+    # 4.4 MiB at the largest passage the service accepts, and in-flight work
+    # is bounded by admission to MaxActive + MaxQueued = 8 passages. 128m is
+    # an order of magnitude over a measured number, and GOMEMLIMIT above
+    # keeps the Go runtime inside it.
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 128
     restart: unless-stopped
 
 networks:
