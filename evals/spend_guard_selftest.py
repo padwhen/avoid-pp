@@ -63,6 +63,7 @@ TOOLS = [
     ("provider_profile", "provider_profile", []),
     ("provider_profile --reps 1", "provider_profile", ["--reps", "1"]),
     ("challenge", "challenge", []),
+    ("segmented", "segmented", []),
 ]
 
 
