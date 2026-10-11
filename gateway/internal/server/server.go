@@ -11,6 +11,19 @@ import (
 	"time"
 )
 
+const (
+	// maxScanBudget mirrors the configuration ceiling on a scan. Used when a
+	// caller does not state a budget, because assuming the maximum is the
+	// safe direction for a write deadline.
+	maxScanBudget = 60 * time.Second
+
+	// writeMargin is what the response needs after the handler is done:
+	// serialisation and the socket write. Generous, because the cost of too
+	// much is an idle connection and the cost of too little is a discarded
+	// result.
+	writeMargin = 10 * time.Second
+)
+
 // Server wraps http.Server with a bounded, observable shutdown.
 type Server struct {
 	http     *http.Server
@@ -26,6 +39,16 @@ type Options struct {
 	Handler http.Handler
 	Drain   time.Duration
 	Log     *slog.Logger
+
+	// ScanBudget is the longest a handler may legitimately take. It sizes
+	// the write deadline, which must outlast the work or a slow-but-valid
+	// scan has its response cut off at the socket - a failure that looks
+	// like a client bug and is not one.
+	//
+	// Zero means the ceiling from config, which is the safe assumption: too
+	// generous a write deadline wastes a connection, too tight a one
+	// discards completed paid work.
+	ScanBudget time.Duration
 
 	// OnDrain runs the moment shutdown begins, before in-flight work is
 	// awaited. The gateway uses it to fail readiness so a load balancer stops
@@ -44,13 +67,44 @@ func New(opts Options) (*Server, error) {
 	if log == nil {
 		log = slog.Default()
 	}
+	budget := opts.ScanBudget
+	if budget <= 0 {
+		budget = maxScanBudget
+	}
+
 	return &Server{
 		http: &http.Server{
 			Handler: opts.Handler,
-			// Bounds a slow or stalled client. Read and write budgets are
-			// sized at C32 against measured behaviour; these are development
-			// defaults that simply must not be unlimited.
+			// Bounds a slow or stalled client.
 			ReadHeaderTimeout: 5 * time.Second,
+
+			// # The three deadlines C32 added
+			//
+			// Until C32 only the header deadline was set, which left three
+			// gaps. Go fills none of them by default: with ReadTimeout and
+			// WriteTimeout unset a client could send one byte of body per
+			// minute forever, and with IdleTimeout unset Go falls back to
+			// ReadTimeout - so setting only ReadTimeout would have closed
+			// every keep-alive connection after ten seconds and forced a
+			// fresh TLS handshake on each scan.
+			//
+			// ReadTimeout bounds the body. The body cap is 64 KiB
+			// (api.MaxRequestBytes), so ten seconds is four orders of
+			// magnitude more than any honest client needs and still finite.
+			ReadTimeout: 10 * time.Second,
+
+			// WriteTimeout must exceed the longest legitimate handler, or it
+			// truncates work that has already been paid for. Go starts this
+			// clock when the request headers are read, so it has to cover
+			// admission wait, the provider call and serialisation - the
+			// whole scan budget, plus margin.
+			WriteTimeout: budget + writeMargin,
+
+			// IdleTimeout keeps connections alive between scans. The
+			// detector client reuses connections for exactly this reason
+			// (C09), and a public caller scanning every minute should not
+			// pay a handshake each time.
+			IdleTimeout: 120 * time.Second,
 			// Headers are bounded as well as bodies. Go's default is 1 MiB,
 			// which is generous for a request whose largest legitimate header
 			// is a bearer token: 16 KiB is far more than this API needs and

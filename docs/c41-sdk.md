@@ -269,13 +269,18 @@ C20 — six tests in `decode_test.go` assert it — and the code is in
 have had no mapping for a status it can certainly receive. Added, with a note
 saying when and why.
 
-**`token_budget_exceeded` cannot be emitted.** It is in `error.schema.json` and
-documented at 422 in `openapi.yaml`, and `gateway/internal/contract` has no
-constant for it. Not a bug — the code is reserved for a budget check that does
-not exist yet — but a client must handle it regardless, because a code the
-contract permits is not a code a client may meet with a crash. Both clients
-define it and a table case covers it; this document is the record that nothing
-currently produces it.
+**`token_budget_exceeded` could not be emitted.** It was in
+`error.schema.json` and documented at 422 in `openapi.yaml`, and
+`gateway/internal/contract` had no constant for it. Both clients defined it
+anyway, because a code the contract permits is not a code a client may meet
+with a crash.
+
+> **Resolved at C32.** Measuring capacity found that the detector's token
+> budget *was* being enforced — it was simply reported as
+> `detector_unavailable`, a 503, which made a permanent sizing error look
+> like a transient outage. The code now has an emitter, and the table case
+> that covered it speculatively covers real behaviour. Handling a code with
+> no emitter turned out to be worth it about three weeks later.
 
 ## Schema parity, in both directions
 

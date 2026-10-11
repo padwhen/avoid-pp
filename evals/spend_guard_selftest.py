@@ -60,6 +60,8 @@ TOOLS = [
     ("outcome_eval --limit 5", "outcome_eval", ["--limit", "5"]),
     ("live_eval", "live_eval", []),
     ("live_eval --limit 3", "live_eval", ["--limit", "3"]),
+    ("provider_profile", "provider_profile", []),
+    ("provider_profile --reps 1", "provider_profile", ["--reps", "1"]),
 ]
 
 

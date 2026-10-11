@@ -3,7 +3,6 @@ package detector
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -138,17 +137,81 @@ func TestAssessRejectsUntrustworthyResponses(t *testing.T) {
 	}
 }
 
-func TestAssessRejectsNon200(t *testing.T) {
-	for _, status := range []int{400, 422, 500, 503} {
-		t.Run(fmt.Sprintf("status %d", status), func(t *testing.T) {
+// TestAssessClassifiesNon200 pins which detector failures are the caller's.
+//
+// Until C32 every non-200 became ErrUnavailable, which made an oversized
+// passage indistinguishable from an outage - a permanent condition reported
+// as a transient one, and one a well-behaved client retries forever. Two
+// statuses now carry information the caller can act on.
+//
+// The invariant underneath is unchanged and is asserted separately below:
+// none of these is ever convertible into a clean assessment.
+func TestAssessClassifiesNon200(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		status int
+		code   string
+		want   error
+	}{
+		{"413 is the caller's passage", 413, "payload_too_large", ErrPassageTooLarge},
+		{"422 over the token budget", 422, "token_budget_exceeded", ErrTokenBudgetExceeded},
+		// A 422 that is not about size means the gateway sent something the
+		// detector could not parse, which is this service's bug.
+		{"422 for anything else", 422, "schema_invalid", ErrInvalidResponse},
+		{"422 with no readable code", 422, "", ErrInvalidResponse},
+		{"400", 400, "malformed_json", ErrUnavailable},
+		{"500", 500, "internal_error", ErrUnavailable},
+		{"503", 503, "detector_unavailable", ErrUnavailable},
+		{"429", 429, "rate_limited", ErrUnavailable},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body := `{"error":{"code":"` + tc.code + `","message":"y"}}`
+			if tc.code == "" {
+				body = `not json at all`
+			}
 			c, _ := clientFor(t, func(w http.ResponseWriter, _ *http.Request) {
-				w.WriteHeader(status)
-				_, _ = w.Write([]byte(`{"error":{"code":"x","message":"y"}}`))
+				w.WriteHeader(tc.status)
+				_, _ = w.Write([]byte(body))
 			})
-			if _, err := c.Assess(context.Background(), request()); !errors.Is(err, ErrUnavailable) {
-				t.Errorf("error = %v, want ErrUnavailable", err)
+
+			got, err := c.Assess(context.Background(), request())
+			if err == nil {
+				t.Fatalf("Assess() = %+v, want an error", got)
+			}
+			if !errors.Is(err, tc.want) {
+				t.Errorf("error = %v, want %v", err, tc.want)
+			}
+			if got != nil {
+				t.Errorf("a failure returned an assessment: %+v", got)
 			}
 		})
+	}
+}
+
+// TestNoDetectorFailureIsEverAClean assessment is the property that matters
+// more than the classification above.
+//
+// Splitting ErrUnavailable into four sentinels creates four chances for one
+// of them to be handled as success somewhere. This asserts the whole set at
+// once rather than trusting each new branch.
+func TestNoDetectorFailureIsEverAnAssessment(t *testing.T) {
+	for _, status := range []int{400, 401, 413, 422, 429, 500, 502, 503, 504} {
+		c, _ := clientFor(t, func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(status)
+			// The nastiest shape: a body that *would* deserialise into a
+			// clean assessment, delivered with a failure status.
+			_, _ = w.Write([]byte(`{"request_id":"r","assessment":` +
+				`{"label":"no_injection_detected","categories":[],"evidence":[]},` +
+				`"coverage":{"original_utf8_bytes":1,"scanned_utf8_bytes":1,` +
+				`"truncated":false},"versions":{"detector":"x","prompt":"y"}}`))
+		})
+		got, err := c.Assess(context.Background(), request())
+		if err == nil {
+			t.Errorf("status %d produced an assessment: %+v", status, got)
+		}
+		if got != nil {
+			t.Errorf("status %d returned a non-nil assessment alongside %v", status, err)
+		}
 	}
 }
 

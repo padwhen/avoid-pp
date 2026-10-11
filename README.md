@@ -726,8 +726,9 @@ did once, about wrong-typed JSON fields, which is how it was found.
 
 Writing them also turned up two gaps in the contract documents: `415` was
 missing from `openapi.yaml` despite the gateway returning it since C20, and
-`token_budget_exceeded` is a code the schema permits that nothing can emit.
-See [C41 acceptance criteria](docs/c41-sdk.md).
+`token_budget_exceeded` was a code the schema permitted that nothing emitted —
+until [C32](docs/c32-capacity.md) found the budget was being enforced and
+reported as a 503. See [C41 acceptance criteria](docs/c41-sdk.md).
 
 ## Running the detector
 
@@ -851,6 +852,47 @@ benign answers.
 
 See [C05](docs/c05-dataset.md) and [C06](docs/c06-runner.md) for acceptance
 criteria and known limitations.
+
+## Capacity and cost
+
+```sh
+make capacity                       # gateway profile, free, ~20s
+make provider-profile CONFIRM=yes   # provider profile, ~USD 0.13
+```
+
+The gateway is **0.078 ms at p50** against a 2 833 ms provider call — 0.002%
+of a scan. Parsing, duplicate-key checking, authentication, rate limiting,
+admission, an internal round trip, response validation and policy together
+cost less than a tenth of a millisecond, so any latency complaint here is a
+provider complaint until proven otherwise.
+
+| | measured | target |
+|---|---|---|
+| end-to-end p95 | 5.9 s | ≤ 7 s |
+| end-to-end p99 | 10.2 s | ≤ 12 s |
+| error rate | 0.46% | ≤ 1% |
+| cost per 1 000 typical scans | USD 9.05 | ≤ USD 10 |
+
+Measuring it changed four defaults and found a bug.
+
+**The queue wait is a step function, not a division.** `MaxQueued` was
+lowered from 8 — first to 6, by a derivation that modelled the wait as
+`(MaxQueued/MaxActive) × L`, and the profile then measured the *same* 5 670 ms
+worst case at 6 and at 8. Under a burst, slots free in whole groups of
+`MaxActive`, so the wait is `ceil(MaxQueued/MaxActive) × L` and both depths
+sit on the same step. Only 4 crosses it. Every derivation is now a test in
+[`coherence_test.go`](gateway/internal/config/coherence_test.go) rather than a
+comment.
+
+**A passage that was too long was reported as an outage.** Four size limits
+apply to one passage in three different units, and the tightest — a 4 096
+token budget — caps it at about 5 324 characters, 16% of the documented
+32 768. Exceeding it returned 503 `detector_unavailable`: a permanent,
+caller-fixable condition dressed as a transient failure, which a well-behaved
+client retries forever. It now returns 422 `token_budget_exceeded` — a code
+the contract has defined since C03 and nothing had ever emitted.
+
+See [C32 acceptance criteria](docs/c32-capacity.md).
 
 ## Where this stands
 

@@ -18,19 +18,40 @@ const (
 
 // Defaults, chosen from what a scan costs rather than from habit.
 //
-// A live Opus scan measured 4.4 seconds and roughly 1,100 input plus 170
-// output tokens, which is about $0.01 at the rates recorded in
-// evals/live_eval.py. At the global default of 2 requests per second that is
-// a ceiling near $1.20 a minute, sustained, if something upstream goes into a
-// loop. The usual web-service instinct of "a few hundred per second" would
-// put that figure in the thousands.
+// A live Opus scan measures 2.833s at the median and about 1,176 input plus
+// 127 output tokens for a typical passage, which is USD 0.0090. These limits
+// are a spend bound first and a fairness mechanism second: the usual
+// web-service instinct of "a few hundred per second" would put the daily
+// ceiling in six figures.
 //
-// So these are deliberately low. They are a spend bound first and a fairness
-// mechanism second. C32 revises them against measured provider latency.
+// # What C32 changed, and why
+//
+// The global rate was 2 per second. Admission completes at most
+// MaxActive / 2.833s = 1.41 per second, so the limiter was permitting
+// traffic the service could not serve, and the excess was shed by admission
+// as `overloaded` instead of by the limiter as `rate_limited`.
+//
+// Both fail closed, so nothing was unsafe. What was wrong is the signal: a
+// service shedding as `overloaded` reads as a capacity incident, and a
+// service shedding as `rate_limited` reads as a caller sending too fast. The
+// second was the true statement, and the dashboards would have said the
+// first. It also made the rate limiter decorative as a spend bound, since
+// admission was already the tighter of the two.
+//
+// So the sustained global rate is now 1 per second, under the measured
+// ceiling of 1.41, and the burst is MaxActive + MaxQueued = 8 - exactly
+// enough to fill every slot and every queue position once, and no more.
+//
+// The per-caller rate is unchanged. One caller at 1 per second can consume
+// about 71% of the ceiling, which is the right answer for a service with one
+// caller and the wrong one for a service with ten; it is noted in
+// docs/c32-capacity.md rather than pre-solved for a tenancy that does not
+// exist.
 const (
 	DefaultCallerRate = "1/5"
-	DefaultGlobalRate = "2/10"
-	DefaultUnauthRate = "2/10"
+	// 1 per second sustained, burst MaxActive + MaxQueued. Derived above.
+	DefaultGlobalRate = "1/8"
+	DefaultUnauthRate = "1/8"
 )
 
 // parseBucket reads a "rate/burst" pair, as in "1/5": one request per second

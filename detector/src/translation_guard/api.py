@@ -34,6 +34,7 @@ from translation_guard.detectors import (
     DetectorUnavailable,
     FakeDetector,
 )
+from translation_guard.limits import PassageTooLarge, TokenBudgetExceeded
 from translation_guard.logs import configure as configure_logging
 from translation_guard.logs import exception_chain
 from translation_guard.prompts import DEFAULT_VERSION as CLAUDE_PROMPT_VERSION
@@ -284,6 +285,38 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "The detector is at capacity.",
                 status.HTTP_503_SERVICE_UNAVAILABLE,
                 retry_after_seconds=1,
+            )
+        except PassageTooLarge as exc:
+            # 413, and a caller-fixable one. Distinct from the token case
+            # below because the remedies differ: fewer bytes versus a
+            # shorter passage, and a caller cannot convert between them
+            # without knowing which bound it hit.
+            record(
+                "rejected",
+                error_code="payload_too_large",
+                error_type=type(exc).__name__,
+            )
+            return error_response(
+                payload.request_id,
+                "payload_too_large",
+                "Passage exceeds the byte limit for one scan.",
+                status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            )
+        except TokenBudgetExceeded as exc:
+            # 422. The contract has defined this code since C03 and nothing
+            # emitted it until C32; before that an oversized passage was
+            # reported as a detector outage, which is a permanent error
+            # dressed as a transient one.
+            record(
+                "rejected",
+                error_code="token_budget_exceeded",
+                error_type=type(exc).__name__,
+            )
+            return error_response(
+                payload.request_id,
+                "token_budget_exceeded",
+                "Passage exceeds the token budget for one scan.",
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
             )
         except DetectorUnavailable as exc:
             # The chain is the diagnostic value - "DetectorUnavailable caused

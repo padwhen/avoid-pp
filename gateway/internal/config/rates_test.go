@@ -13,11 +13,15 @@ func TestParseRatesDefaults(t *testing.T) {
 	if cfg.PerCaller.PerSecond != 1 || cfg.PerCaller.Burst != 5 {
 		t.Errorf("per-caller = %+v, want 1/5", cfg.PerCaller)
 	}
-	if cfg.Global.PerSecond != 2 || cfg.Global.Burst != 10 {
-		t.Errorf("global = %+v, want 2/10", cfg.Global)
+	// 2/10 until C32, which lowered the sustained rate to sit under the
+	// measured admission ceiling. coherence_test.go asserts the derivation;
+	// this asserts the literal, so both the reasoning and the value are
+	// pinned.
+	if cfg.Global.PerSecond != 1 || cfg.Global.Burst != 8 {
+		t.Errorf("global = %+v, want 1/8", cfg.Global)
 	}
-	if cfg.Unauthenticated.PerSecond != 2 || cfg.Unauthenticated.Burst != 10 {
-		t.Errorf("unauthenticated = %+v, want 2/10", cfg.Unauthenticated)
+	if cfg.Unauthenticated.PerSecond != 1 || cfg.Unauthenticated.Burst != 8 {
+		t.Errorf("unauthenticated = %+v, want 1/8", cfg.Unauthenticated)
 	}
 }
 

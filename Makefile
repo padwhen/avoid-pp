@@ -23,7 +23,7 @@ DETECTOR_HOST ?= 127.0.0.1
 DETECTOR_PORT ?= 9000
 
 .DEFAULT_GOAL := help
-.PHONY: check-gate-report provenance check-sdk check-sdk-go check-sdk-python demo check-examples live-translate splits splits-freeze duplicates audit check-splits check-duplicates ingest help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner dev-key run-gateway run-detector up down logs smoke live-smoke live-eval
+.PHONY: capacity provider-profile check-gate-report provenance check-sdk check-sdk-go check-sdk-python demo check-examples live-translate splits splits-freeze duplicates audit check-splits check-duplicates ingest help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner dev-key run-gateway run-detector up down logs smoke live-smoke live-eval
 
 help:
 	@printf '%s\n' \
@@ -36,6 +36,8 @@ help:
 	  'make check-sdk        Test both SDK clients against the shared expectations table' \
 	  'make check-gate-report  Verify every input the C30 gate report is a claim about' \
 	  'make provenance       Print the dataset file and scored-content digests' \
+	  'make capacity         Profile gateway overhead and saturation (free, ~20s)' \
+	  'make provider-profile Measure provider latency and cost by input size (COSTS MONEY)' \
 	  'make check-evals      Validate the Finnish seed dataset and report progress' \
 	  'make check-examples   Test the protected-translator example' \
 	  'make live-translate   Translate one Finnish passage live (COSTS MONEY)' \
@@ -141,6 +143,20 @@ check-gate-report:
 
 provenance:
 	$(UV) run --project detector --locked --no-sync python evals/provenance.py
+
+# Free, and deliberately outside `make check`: it takes about 20 seconds for a
+# number that only changes when the service does. The detector is an
+# in-process stub with injected latency, so no provider is contacted.
+capacity:
+	cd gateway && AVOIDPP_CAPACITY=1 \
+	  AVOIDPP_CAPACITY_HARDWARE="$${AVOIDPP_CAPACITY_HARDWARE:-unnamed hardware}" \
+	  $(GO) test ./internal/capacity/ -run TestCapacityProfile -timeout 10m -v
+
+# The paid half of C32: nine real scans across three input sizes.
+provider-profile:
+	cd detector && set -a && . ../.env && set +a && \
+	  $(UV) run --locked --no-sync python ../evals/provider_profile.py \
+	  $(if $(filter yes,$(CONFIRM)),--confirm,) $(if $(REPS),--reps $(REPS),)
 
 # Exact duplicates fail the build; near-duplicates and leakage are reported
 # for the author to judge, because a tool cannot tell a mistake from a

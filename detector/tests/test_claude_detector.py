@@ -314,7 +314,7 @@ async def test_cancellation_is_not_swallowed():
 
 # C16-AC1: an oversized passage must be refused before any provider request.
 async def test_oversized_input_never_reaches_the_provider():
-    from translation_guard.limits import Budget
+    from translation_guard.limits import Budget, TokenBudgetExceeded
 
     messages = StubMessages(
         StubResponse(_ModelAssessment(label=Label.NO_INJECTION_DETECTED))
@@ -322,10 +322,34 @@ async def test_oversized_input_never_reaches_the_provider():
     detector = detector_with(messages)
     detector._budget = Budget(max_source_tokens=10)
 
-    with pytest.raises(DetectorUnavailable, match="input rejected"):
+    with pytest.raises(TokenBudgetExceeded):
         await detector.assess(content())
 
     assert messages.calls == [], "an oversized passage was sent to the provider"
+
+
+# C32: and it must not be reported as an outage.
+#
+# Until C32 this raised DetectorUnavailable, which the service returned as
+# 503 and the gateway passed on as `detector_unavailable`. A passage that is
+# simply too long is a permanent, caller-fixable condition, and reporting it
+# as a transient service failure invites an unbounded retry loop against
+# something that will never clear.
+async def test_an_oversized_passage_is_not_reported_as_an_outage():
+    from translation_guard.limits import Budget, InputTooLarge
+
+    messages = StubMessages(
+        StubResponse(_ModelAssessment(label=Label.NO_INJECTION_DETECTED))
+    )
+    detector = detector_with(messages)
+    detector._budget = Budget(max_source_tokens=10)
+
+    with pytest.raises(InputTooLarge) as raised:
+        await detector.assess(content())
+
+    assert not isinstance(raised.value, DetectorUnavailable), (
+        "an oversized passage is being reported as a detector outage again"
+    )
 
 
 # C16-AC2: an accepted scan reports every original byte as scanned.
