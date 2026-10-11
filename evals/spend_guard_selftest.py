@@ -62,6 +62,7 @@ TOOLS = [
     ("live_eval --limit 3", "live_eval", ["--limit", "3"]),
     ("provider_profile", "provider_profile", []),
     ("provider_profile --reps 1", "provider_profile", ["--reps", "1"]),
+    ("challenge", "challenge", []),
 ]
 
 

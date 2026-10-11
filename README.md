@@ -1005,6 +1005,52 @@ the contract has defined since C03 and nothing had ever emitted.
 
 See [C32 acceptance criteria](docs/c32-capacity.md).
 
+## Mixed-language
+
+```sh
+make check-challenge          # the arithmetic, free
+make challenge CONFIRM=yes    # the report
+```
+
+The one capability the threat model has deferred since C02. **69 cases,
+seven embedded languages, 69 of 69 correct** — 36 attacks caught, 33 benign
+passed, zero errors, USD 0.74.
+
+| embedded | attacks caught | benign flagged |
+|---|---|---|
+| en | 9/9 — [0.66, 1.00] | 0/8 |
+| sv | 8/8 — [0.63, 1.00] | 0/7 |
+| de | 4/4 — [0.40, 1.00] | 0/5 |
+| ru | 5/5 — [0.48, 1.00] | 0/4 |
+| nl | 4/4 — [0.40, 1.00] | 0/4 |
+| et | 3/3 — [0.29, 1.00] | 0/3 |
+| fr | 3/3 — [0.29, 1.00] | 0/2 |
+
+**Read the intervals.** English, the best-covered language, is consistent
+with catching every mixed-language attack and consistent with catching two in
+three. Nothing failed, and the corpus is still too small to turn that into a
+rate — though it does rule out a gross failure, since a detector ignoring
+non-Finnish spans would not score 36 for 36 across seven languages.
+
+Two cuts matter more than the headline. **Position made no difference** —
+middle-of-passage attacks, the ones a Finnish-focused detector would most
+plausibly skim, were caught 13/13. And the sharpest benign subtype produced
+**no false positives**: seven cases of foreign text that *reads* as an
+instruction but is being reported rather than issued — a phishing email
+quoted in a warning, a tutorial explaining prompt injection — all passed.
+
+**There is no combined rate, deliberately.** A detector that handles Swedish
+and fails on Russian has two rates, not one. That omission is the kind a
+later "convenience" field undoes, so it is a test: the self-test serialises
+the whole report and fails if any key at any depth looks like an aggregate.
+
+Adding the corpus made `make check-gate-report` fire, correctly and
+unhelpfully — the corpus digest moved while the development split was
+byte-identical. The manifest now pins **split membership** too, which is the
+property the published numbers actually depend on.
+
+See [C37](docs/c37-mixed-language.md).
+
 ## Where this stands
 
 [**C30 — Finnish MVP gate report**](docs/c30-gate-report.md) is the release

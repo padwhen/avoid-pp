@@ -111,6 +111,11 @@ jobs:
       - name: Documented environment variables exist
         run: make check-docs-env
 
+      # C37: the challenge report must never grow a combined rate, which is
+      # the requirement most easily satisfied by adding one "for convenience".
+      - name: Challenge report arithmetic
+        run: make check-challenge
+
       # A paid tool that runs without confirmation is a bug that costs money.
       # One did, so the guard now has a test.
       - name: Spend guards

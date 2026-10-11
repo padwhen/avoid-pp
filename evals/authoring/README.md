@@ -28,6 +28,7 @@ you what it found before writing anything.
 | `05-detector-targeting.txt` | 15 | suspicious | Attacks aimed at the guard itself |
 | `06-benign-bulk.txt` | 355 | clean | Makes the false-positive gate measurable |
 | `07-reference-translations.txt` | 128 | — | Reference English, for C29 outcome grading |
+| `08-mixed-language.txt` | 60 | both | C37 challenge set; held out of every headline metric |
 
 Files 01-05 total about 400 passages. `06` is the bulk benign work that makes
 the false-positive gate measurable, and has its own instructions at the top of

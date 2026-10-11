@@ -23,7 +23,7 @@ DETECTOR_HOST ?= 127.0.0.1
 DETECTOR_PORT ?= 9000
 
 .DEFAULT_GOAL := help
-.PHONY: check-docs-env deploy-smoke deploy-runbooks capacity provider-profile check-gate-report provenance check-sdk check-sdk-go check-sdk-python demo check-examples live-translate splits splits-freeze duplicates audit check-splits check-duplicates ingest help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner dev-key run-gateway run-detector up down logs smoke live-smoke live-eval
+.PHONY: challenge challenge-selftest check-docs-env deploy-smoke deploy-runbooks capacity provider-profile check-gate-report provenance check-sdk check-sdk-go check-sdk-python demo check-examples live-translate splits splits-freeze duplicates audit check-splits check-duplicates ingest help bootstrap bootstrap-go bootstrap-python check check-go check-python check-contracts check-contracts-selftest check-evals check-evals-runner dev-key run-gateway run-detector up down logs smoke live-smoke live-eval
 
 help:
 	@printf '%s\n' \
@@ -37,6 +37,8 @@ help:
 	  'make check-gate-report  Verify every input the C30 gate report is a claim about' \
 	  'make provenance       Print the dataset file and scored-content digests' \
 	  'make check-docs-env   Assert every AVOIDPP_* named in the docs is read somewhere' \
+	  'make challenge        Mixed-language challenge report (COSTS MONEY)' \
+	  'make check-challenge  Assert the challenge arithmetic and its missing aggregate' \
 	  'make deploy-smoke     Kubernetes deployment drills (needs docker, kind, kubectl)' \
 	  'make deploy-runbooks  Operating-procedure drills against a running cluster' \
 	  'make capacity         Profile gateway overhead and saturation (free, ~20s)' \
@@ -74,7 +76,7 @@ bootstrap-go:
 bootstrap-python:
 	cd detector && $(UV) sync --locked
 
-check: check-go check-python check-contracts check-contracts-selftest check-sdk check-examples check-evals check-evals-runner check-splits check-duplicates check-spend-guards check-gate-report check-docs-env
+check: check-go check-python check-contracts check-contracts-selftest check-sdk check-examples check-evals check-evals-runner check-splits check-duplicates check-spend-guards check-gate-report check-docs-env check-challenge
 
 check-go:
 	@files="$$(cd gateway && $(GOFMT) -l .)" || exit $$?; \
@@ -149,6 +151,17 @@ check-gate-report:
 # effect for some other reason. C35 shipped exactly that mistake once.
 check-docs-env:
 	$(UV) run --project detector --locked --no-sync python scripts/check-docs-env.py
+
+# Free. The report itself costs money; this is the arithmetic behind it,
+# including the assertion that no combined rate exists at any depth.
+check-challenge:
+	$(UV) run --project detector --locked --no-sync python evals/challenge_selftest.py
+
+# One provider request per challenge case. Never run by CI or by `make check`.
+challenge:
+	cd detector && set -a && . ../.env && set +a && \
+	  $(UV) run --locked --no-sync python ../evals/challenge.py \
+	  $(if $(filter yes,$(CONFIRM)),--confirm,) $(if $(MODEL),--model $(MODEL),)
 
 provenance:
 	$(UV) run --project detector --locked --no-sync python evals/provenance.py
