@@ -21,10 +21,19 @@ primary_region = 'arn'
 [build]
   dockerfile = '../../detector/Dockerfile'
 
-# The image's CMD passes --host and --port to uvicorn directly, so
-# AVOIDPP_DETECTOR_HOST and AVOIDPP_DETECTOR_PORT are not set here: they are
-# real settings that this image does not consult, and setting them would read
-# as configuration while changing nothing.
+# Fly's private network is IPv6 only, and the image's CMD binds 0.0.0.0 -
+# which is IPv4. The result is a detector that starts, passes its own health
+# check, and refuses every connection from the gateway in about 5 ms. So the
+# command is overridden here to bind `::`, which accepts both.
+#
+# This is a deployment concern rather than an image one: Compose and the
+# Kubernetes manifests are IPv4 and work with the image default.
+[processes]
+  app = "uvicorn translation_guard.api:app --host :: --port 9000"
+
+# AVOIDPP_DETECTOR_HOST and AVOIDPP_DETECTOR_PORT are deliberately unset:
+# they are real settings that this image does not consult, because the
+# command above passes --host and --port directly.
 [env]
   # Live, which is the only reason to deploy this at all. Fake mode is for
   # development and CI, and a deployed fake detector is a service that
